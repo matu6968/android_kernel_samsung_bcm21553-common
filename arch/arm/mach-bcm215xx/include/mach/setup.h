@@ -25,6 +25,7 @@
 #include <asm/mach/time.h>
 
 extern void bcm21553_map_io(void);
+extern void bcm21553_reserve(void);
 extern void bcm21553_platform_init(void);
 extern void bcm21553_init_devices(void);
 extern void bcm21553_init_irq(void);
