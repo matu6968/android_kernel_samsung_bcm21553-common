@@ -282,6 +282,12 @@ config CRYPTO_DEV_PICOXCELL
 	  and for 3gpp Layer 2 ciphering support.
 
 	  Saying m here will build a module named pipcoxcell_crypto.
+config CRYPTO_DEV_BRCM_BLKCRYPTO
+       tristate "Support for BRCM BLKCRYPTO hw accelerator"
+       depends on ARCH_BCM215XX
+       select CRYPTO_AES
+       help
+          Driver for BRCM Bulk Cryptography accelerator.
 
 config CRYPTO_DEV_S5P
 	tristate "Support for Samsung S5PV210 crypto accelerator"

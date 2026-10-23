@@ -1,691 +1,765 @@
-/*
- * Copyright (c) 2011 Bosch Sensortec GmbH
- * Copyright (c) 2011 Unixphere
- *
- * This driver adds support for Bosch Sensortec's digital acceleration
- * sensors BMA150 and SMB380.
- * The SMB380 is fully compatible with BMA150 and only differs in packaging.
- *
- * The datasheet for the BMA150 chip can be found here:
- * http://www.bosch-sensortec.com/content/language1/downloads/BST-BMA150-DS000-07.pdf
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- */
+/*******************************************************************************
+* Copyright 2010 Broadcom Corporation.  All rights reserved.
+*
+* 	@file	drivers/input/misc/bma150.c
+*
+* Unless you and Broadcom execute a separate written software license agreement
+* governing use of this software, this software is licensed to you under the
+* terms of the GNU General Public License version 2, available at
+* http://www.gnu.org/copyleft/gpl.html (the "GPL").
+*
+* Notwithstanding the above, under no circumstances may you combine this
+* software in any way with any other Broadcom software provided under a license
+* other than the GPL, without Broadcom's express prior written consent.
+*******************************************************************************/
+
+#include <linux/version.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/ctype.h>
+#include <linux/init.h>
+#include <linux/list.h>
+#include <linux/irq.h>
+#include <linux/platform_device.h>
+#include <linux/spinlock.h>
+#include <linux/interrupt.h>
+#include <linux/fs.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
-#include <linux/input-polldev.h>
-#include <linux/interrupt.h>
+#include <linux/miscdevice.h>
+#include <linux/uaccess.h>
+#include <linux/bma150.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/pm.h>
-#include <linux/pm_runtime.h>
-#include <linux/input/bma150.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+#include "smb380.h"
+#include "smb380calib.h"
 
-#define ABSMAX_ACC_VAL		0x01FF
-#define ABSMIN_ACC_VAL		-(ABSMAX_ACC_VAL)
+/* uncomment to enable interrupt based event generation */
+/* #define BMA150_ACCL_IRQ_MODE */
+#define ACCL_NAME			"bma150_accl"
+#define ACCL_VENDORID			0x0001
 
-/* Each axis is represented by a 2-byte data word */
-#define BMA150_XYZ_DATA_SIZE	6
+#define LOW_G_THRES			5
+#define LOW_G_DUR			50
+#define HIGH_G_THRES			10
+#define HIGH_G_DUR			1
+#define ANY_MOTION_THRES		1
+#define ANY_MOTION_CT			1
 
-/* Input poll interval in milliseconds */
-#define BMA150_POLL_INTERVAL	10
-#define BMA150_POLL_MAX		200
-#define BMA150_POLL_MIN		0
+MODULE_LICENSE("GPL v2");
+MODULE_ALIAS("bma150");
 
-#define BMA150_BW_25HZ		0
-#define BMA150_BW_50HZ		1
-#define BMA150_BW_100HZ		2
-#define BMA150_BW_190HZ		3
-#define BMA150_BW_375HZ		4
-#define BMA150_BW_750HZ		5
-#define BMA150_BW_1500HZ	6
-
-#define BMA150_RANGE_2G		0
-#define BMA150_RANGE_4G		1
-#define BMA150_RANGE_8G		2
-
-#define BMA150_MODE_NORMAL	0
-#define BMA150_MODE_SLEEP	2
-#define BMA150_MODE_WAKE_UP	3
-
-/* Data register addresses */
-#define BMA150_DATA_0_REG	0x00
-#define BMA150_DATA_1_REG	0x01
-#define BMA150_DATA_2_REG	0x02
-
-/* Control register addresses */
-#define BMA150_CTRL_0_REG	0x0A
-#define BMA150_CTRL_1_REG	0x0B
-#define BMA150_CTRL_2_REG	0x14
-#define BMA150_CTRL_3_REG	0x15
-
-/* Configuration/Setting register addresses */
-#define BMA150_CFG_0_REG	0x0C
-#define BMA150_CFG_1_REG	0x0D
-#define BMA150_CFG_2_REG	0x0E
-#define BMA150_CFG_3_REG	0x0F
-#define BMA150_CFG_4_REG	0x10
-#define BMA150_CFG_5_REG	0x11
-
-#define BMA150_CHIP_ID		2
-#define BMA150_CHIP_ID_REG	BMA150_DATA_0_REG
-
-#define BMA150_ACC_X_LSB_REG	BMA150_DATA_2_REG
-
-#define BMA150_SLEEP_POS	0
-#define BMA150_SLEEP_MSK	0x01
-#define BMA150_SLEEP_REG	BMA150_CTRL_0_REG
-
-#define BMA150_BANDWIDTH_POS	0
-#define BMA150_BANDWIDTH_MSK	0x07
-#define BMA150_BANDWIDTH_REG	BMA150_CTRL_2_REG
-
-#define BMA150_RANGE_POS	3
-#define BMA150_RANGE_MSK	0x18
-#define BMA150_RANGE_REG	BMA150_CTRL_2_REG
-
-#define BMA150_WAKE_UP_POS	0
-#define BMA150_WAKE_UP_MSK	0x01
-#define BMA150_WAKE_UP_REG	BMA150_CTRL_3_REG
-
-#define BMA150_SW_RES_POS	1
-#define BMA150_SW_RES_MSK	0x02
-#define BMA150_SW_RES_REG	BMA150_CTRL_0_REG
-
-/* Any-motion interrupt register fields */
-#define BMA150_ANY_MOTION_EN_POS	6
-#define BMA150_ANY_MOTION_EN_MSK	0x40
-#define BMA150_ANY_MOTION_EN_REG	BMA150_CTRL_1_REG
-
-#define BMA150_ANY_MOTION_DUR_POS	6
-#define BMA150_ANY_MOTION_DUR_MSK	0xC0
-#define BMA150_ANY_MOTION_DUR_REG	BMA150_CFG_5_REG
-
-#define BMA150_ANY_MOTION_THRES_REG	BMA150_CFG_4_REG
-
-/* Advanced interrupt register fields */
-#define BMA150_ADV_INT_EN_POS		6
-#define BMA150_ADV_INT_EN_MSK		0x40
-#define BMA150_ADV_INT_EN_REG		BMA150_CTRL_3_REG
-
-/* High-G interrupt register fields */
-#define BMA150_HIGH_G_EN_POS		1
-#define BMA150_HIGH_G_EN_MSK		0x02
-#define BMA150_HIGH_G_EN_REG		BMA150_CTRL_1_REG
-
-#define BMA150_HIGH_G_HYST_POS		3
-#define BMA150_HIGH_G_HYST_MSK		0x38
-#define BMA150_HIGH_G_HYST_REG		BMA150_CFG_5_REG
-
-#define BMA150_HIGH_G_DUR_REG		BMA150_CFG_3_REG
-#define BMA150_HIGH_G_THRES_REG		BMA150_CFG_2_REG
-
-/* Low-G interrupt register fields */
-#define BMA150_LOW_G_EN_POS		0
-#define BMA150_LOW_G_EN_MSK		0x01
-#define BMA150_LOW_G_EN_REG		BMA150_CTRL_1_REG
-
-#define BMA150_LOW_G_HYST_POS		0
-#define BMA150_LOW_G_HYST_MSK		0x07
-#define BMA150_LOW_G_HYST_REG		BMA150_CFG_5_REG
-
-#define BMA150_LOW_G_DUR_REG		BMA150_CFG_1_REG
-#define BMA150_LOW_G_THRES_REG		BMA150_CFG_0_REG
-
-struct bma150_data {
-	struct i2c_client *client;
-	struct input_polled_dev *input_polled;
-	struct input_dev *input;
-	u8 mode;
+struct drv_data {
+	struct input_dev *ip_dev;
+	struct i2c_client *i2c;
+	smb380_t smb380;
+	int irq;
+	int bma150_accl_mode;
+	char bits_per_transfer;
+	struct delayed_work work_data;
+	bool config;
+	struct list_head next_dd;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend suspend_desc;
+#endif
 };
 
-/*
- * The settings for the given range, bandwidth and interrupt features
- * are stated and verified by Bosch Sensortec where they are configured
- * to provide a generic sensitivity performance.
+static struct mutex bma150_accl_dd_lock;
+static struct mutex bma150_accl_wrk_lock;
+static struct list_head dd_list;
+#ifndef BMA150_ACCL_IRQ_MODE
+static struct timer_list bma_wakeup_timer;
+#endif
+static atomic_t bma_on;
+static atomic_t a_flag;
+static smb380acc_t newacc;
+
+/* cannot avoid global pointer as the smb380 read/ write callback does not
+ * absract interface level information
  */
-static struct bma150_cfg default_cfg __devinitdata = {
-	.any_motion_int = 1,
-	.hg_int = 1,
-	.lg_int = 1,
-	.any_motion_dur = 0,
-	.any_motion_thres = 0,
-	.hg_hyst = 0,
-	.hg_dur = 150,
-	.hg_thres = 160,
-	.lg_hyst = 0,
-	.lg_dur = 150,
-	.lg_thres = 20,
-	.range = BMA150_RANGE_2G,
-	.bandwidth = BMA150_BW_50HZ
+static struct i2c_client *bma150_accl_client;
+
+enum bma150_accl_modes {
+	SENSOR_DELAY_FASTEST = 0,
+	SENSOR_DELAY_GAME = 20,
+	SENSOR_DELAY_UI = 60,
+	SENSOR_DELAY_NORMAL = 200
 };
 
-static int bma150_write_byte(struct i2c_client *client, u8 reg, u8 val)
+static inline void bma150_accl_i2c_delay(unsigned int msec)
 {
-	s32 ret;
-
-	/* As per specification, disable irq in between register writes */
-	if (client->irq)
-		disable_irq_nosync(client->irq);
-
-	ret = i2c_smbus_write_byte_data(client, reg, val);
-
-	if (client->irq)
-		enable_irq(client->irq);
-
-	return ret;
+	mdelay(msec);
 }
 
-static int bma150_set_reg_bits(struct i2c_client *client,
-					int val, int shift, u8 mask, u8 reg)
+/*      i2c write routine for bma150    */
+static inline char bma150_accl_i2c_write(unsigned char reg_addr,
+					 unsigned char *data, unsigned char len)
 {
-	int data;
+	s32 dummy;
+	if (bma150_accl_client == NULL)	/*      No global client pointer?       */
+		return -1;
 
-	data = i2c_smbus_read_byte_data(client, reg);
-	if (data < 0)
-		return data;
-
-	data = (data & ~mask) | ((val << shift) & mask);
-	return bma150_write_byte(client, reg, data);
-}
-
-static int bma150_set_mode(struct bma150_data *bma150, u8 mode)
-{
-	int error;
-
-	error = bma150_set_reg_bits(bma150->client, mode, BMA150_WAKE_UP_POS,
-				BMA150_WAKE_UP_MSK, BMA150_WAKE_UP_REG);
-	if (error)
-		return error;
-
-	error = bma150_set_reg_bits(bma150->client, mode, BMA150_SLEEP_POS,
-				BMA150_SLEEP_MSK, BMA150_SLEEP_REG);
-	if (error)
-		return error;
-
-	if (mode == BMA150_MODE_NORMAL)
-		msleep(2);
-
-	bma150->mode = mode;
+	while (len--) {
+		dummy =
+		    i2c_smbus_write_byte_data(bma150_accl_client, reg_addr,
+					      *data);
+		reg_addr++;
+		data++;
+		if (dummy < 0)
+			return -1;
+	}
 	return 0;
 }
 
-static int __devinit bma150_soft_reset(struct bma150_data *bma150)
+/*      i2c read routine for bma150     */
+static inline char bma150_accl_i2c_read(unsigned char reg_addr,
+					unsigned char *data, unsigned char len)
 {
-	int error;
+	s32 dummy;
+	if (bma150_accl_client == NULL)	/*      No global client pointer?       */
+		return -1;
 
-	error = bma150_set_reg_bits(bma150->client, 1, BMA150_SW_RES_POS,
-				BMA150_SW_RES_MSK, BMA150_SW_RES_REG);
-	if (error)
-		return error;
-
-	msleep(2);
+	while (len--) {
+		dummy = i2c_smbus_read_byte_data(bma150_accl_client, reg_addr);
+		if (dummy < 0)
+			return -1;
+		*data = dummy & 0x000000ff;
+		reg_addr++;
+		data++;
+	}
 	return 0;
 }
 
-static int __devinit bma150_set_range(struct bma150_data *bma150, u8 range)
+static int bma150_accl_power_down(struct drv_data *dd)
 {
-	return bma150_set_reg_bits(bma150->client, range, BMA150_RANGE_POS,
-				BMA150_RANGE_MSK, BMA150_RANGE_REG);
+	u8 data;
+	int rc;
+
+	/* smb380 does not provide functionality to power down the device */
+	/* For sleep mode set bit 0 of control register (0x0A) to 1 */
+	data = 0x01;
+	rc = i2c_smbus_write_byte_data(dd->i2c, 0x0A, data);
+	if (rc < 0)
+		pr_err("G-Sensor power down failed\n");
+	else
+		atomic_set(&bma_on, 0);
+
+	return rc;
 }
 
-static int __devinit bma150_set_bandwidth(struct bma150_data *bma150, u8 bw)
+static int bma150_accl_power_up(struct drv_data *dd)
 {
-	return bma150_set_reg_bits(bma150->client, bw, BMA150_BANDWIDTH_POS,
-				BMA150_BANDWIDTH_MSK, BMA150_BANDWIDTH_REG);
+	u8 data;
+	int rc;
+
+	/* smb380 does not provide functionality to power up the device */
+	/* To exit sleep mode set bit 0 of control register (0x0A) to 0 */
+	data = 0x00;
+	rc = i2c_smbus_write_byte_data(dd->i2c, 0x0A, data);
+	if (rc < 0)
+		pr_err("G-Sensor power up failed\n");
+	else
+		atomic_set(&bma_on, 1);
+
+	return rc;
 }
 
-static int __devinit bma150_set_low_g_interrupt(struct bma150_data *bma150,
-					u8 enable, u8 hyst, u8 dur, u8 thres)
+#if defined(CONFIG_PM) || defined(CONFIG_HAS_EARLYSUSPEND)
+static int bma150_accl_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	int error;
+	struct drv_data *dd;
+	dd = i2c_get_clientdata(client);
 
-	error = bma150_set_reg_bits(bma150->client, hyst,
-				BMA150_LOW_G_HYST_POS, BMA150_LOW_G_HYST_MSK,
-				BMA150_LOW_G_HYST_REG);
-	if (error)
-		return error;
+#ifdef BMA150_ACCL_IRQ_MODE
+	disable_irq(dd->irq);
+#else
+	del_timer(&bma_wakeup_timer);
+	cancel_delayed_work_sync(&dd->work_data);
+#endif
+	if (atomic_read(&bma_on))
+		bma150_accl_power_down(dd);
 
-	error = bma150_write_byte(bma150->client, BMA150_LOW_G_DUR_REG, dur);
-	if (error)
-		return error;
-
-	error = bma150_write_byte(bma150->client, BMA150_LOW_G_THRES_REG, thres);
-	if (error)
-		return error;
-
-	return bma150_set_reg_bits(bma150->client, !!enable,
-				BMA150_LOW_G_EN_POS, BMA150_LOW_G_EN_MSK,
-				BMA150_LOW_G_EN_REG);
+	return 0;
 }
 
-static int __devinit bma150_set_high_g_interrupt(struct bma150_data *bma150,
-					u8 enable, u8 hyst, u8 dur, u8 thres)
+static int bma150_accl_resume(struct i2c_client *client)
 {
-	int error;
+	struct drv_data *dd;
+	dd = i2c_get_clientdata(client);
 
-	error = bma150_set_reg_bits(bma150->client, hyst,
-				BMA150_HIGH_G_HYST_POS, BMA150_HIGH_G_HYST_MSK,
-				BMA150_HIGH_G_HYST_REG);
-	if (error)
-		return error;
+#ifdef BMA150_ACCL_IRQ_MODE
+	enable_irq(dd->irq);
+	if (atomic_read(&a_flag))
+		bma150_accl_power_up(dd);
+#else
+	if (atomic_read(&a_flag))
+		mod_timer(&bma_wakeup_timer, jiffies + HZ / 1000);
+#endif
 
-	error = bma150_write_byte(bma150->client,
-				BMA150_HIGH_G_DUR_REG, dur);
-	if (error)
-		return error;
-
-	error = bma150_write_byte(bma150->client,
-				BMA150_HIGH_G_THRES_REG, thres);
-	if (error)
-		return error;
-
-	return bma150_set_reg_bits(bma150->client, !!enable,
-				BMA150_HIGH_G_EN_POS, BMA150_HIGH_G_EN_MSK,
-				BMA150_HIGH_G_EN_REG);
+	return 0;
 }
 
+#else
+#define bma150_accl_suspend NULL
+#define bma150_accl_resume NULL
+#endif /* CONFIG_PM */
 
-static int __devinit bma150_set_any_motion_interrupt(struct bma150_data *bma150,
-						u8 enable, u8 dur, u8 thres)
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void bma150_accl_early_suspend(struct early_suspend *desc)
 {
-	int error;
-
-	error = bma150_set_reg_bits(bma150->client, dur,
-				BMA150_ANY_MOTION_DUR_POS,
-				BMA150_ANY_MOTION_DUR_MSK,
-				BMA150_ANY_MOTION_DUR_REG);
-	if (error)
-		return error;
-
-	error = bma150_write_byte(bma150->client,
-				BMA150_ANY_MOTION_THRES_REG, thres);
-	if (error)
-		return error;
-
-	error = bma150_set_reg_bits(bma150->client, !!enable,
-				BMA150_ADV_INT_EN_POS, BMA150_ADV_INT_EN_MSK,
-				BMA150_ADV_INT_EN_REG);
-	if (error)
-		return error;
-
-	return bma150_set_reg_bits(bma150->client, !!enable,
-				BMA150_ANY_MOTION_EN_POS,
-				BMA150_ANY_MOTION_EN_MSK,
-				BMA150_ANY_MOTION_EN_REG);
+	struct drv_data *dd = container_of(desc, struct drv_data, suspend_desc);
+	pm_message_t mesg = {
+		.event = PM_EVENT_SUSPEND,
+		};
+	bma150_accl_suspend(dd->i2c, mesg);
 }
 
-static void bma150_report_xyz(struct bma150_data *bma150)
+static void bma150_accl_late_resume(struct early_suspend *desc)
 {
-	u8 data[BMA150_XYZ_DATA_SIZE];
-	s16 x, y, z;
-	s32 ret;
-
-	ret = i2c_smbus_read_i2c_block_data(bma150->client,
-			BMA150_ACC_X_LSB_REG, BMA150_XYZ_DATA_SIZE, data);
-	if (ret != BMA150_XYZ_DATA_SIZE)
-		return;
-
-	x = ((0xc0 & data[0]) >> 6) | (data[1] << 2);
-	y = ((0xc0 & data[2]) >> 6) | (data[3] << 2);
-	z = ((0xc0 & data[4]) >> 6) | (data[5] << 2);
-
-	/* sign extension */
-	x = (s16) (x << 6) >> 6;
-	y = (s16) (y << 6) >> 6;
-	z = (s16) (z << 6) >> 6;
-
-	input_report_abs(bma150->input, ABS_X, x);
-	input_report_abs(bma150->input, ABS_Y, y);
-	input_report_abs(bma150->input, ABS_Z, z);
-	input_sync(bma150->input);
+	struct drv_data *dd = container_of(desc, struct drv_data, suspend_desc);
+	bma150_accl_resume(dd->i2c);
 }
+#endif /* CONFIG_HAS_EARLYSUSPEND */
 
-static irqreturn_t bma150_irq_thread(int irq, void *dev)
+#ifdef BMA150_ACCL_IRQ_MODE
+static irqreturn_t bma150_accl_irq(int irq, void *dev_id)
 {
-	bma150_report_xyz(dev);
+	struct device *dev = dev_id;
+	struct drv_data *dd;
+	long delay;
+
+	dd = dev_get_drvdata(dev);
+	delay = dd->bma150_accl_mode * HZ / 1000;
+	if (!delay)		/* check for FAST MODE */
+		delay = 1;
+	schedule_delayed_work(&dd->work_data, delay);
 
 	return IRQ_HANDLED;
 }
-
-static void bma150_poll(struct input_polled_dev *dev)
+#else
+void bma_wakeup_timer_func(unsigned long data)
 {
-	bma150_report_xyz(dev->private);
-}
+	struct drv_data *dd;
+	long delay = 0;
 
-static int bma150_open(struct bma150_data *bma150)
-{
-	int error;
+	dd = (struct drv_data *)data;
 
-	error = pm_runtime_get_sync(&bma150->client->dev);
-	if (error && error != -ENOSYS)
-		return error;
-
-	/*
-	 * See if runtime PM woke up the device. If runtime PM
-	 * is disabled we need to do it ourselves.
-	 */
-	if (bma150->mode != BMA150_MODE_NORMAL) {
-		error = bma150_set_mode(bma150, BMA150_MODE_NORMAL);
-		if (error)
-			return error;
-	}
-
-	return 0;
-}
-
-static void bma150_close(struct bma150_data *bma150)
-{
-	pm_runtime_put_sync(&bma150->client->dev);
-
-	if (bma150->mode != BMA150_MODE_SLEEP)
-		bma150_set_mode(bma150, BMA150_MODE_SLEEP);
-}
-
-static int bma150_irq_open(struct input_dev *input)
-{
-	struct bma150_data *bma150 = input_get_drvdata(input);
-
-	return bma150_open(bma150);
-}
-
-static void bma150_irq_close(struct input_dev *input)
-{
-	struct bma150_data *bma150 = input_get_drvdata(input);
-
-	bma150_close(bma150);
-}
-
-static void bma150_poll_open(struct input_polled_dev *ipoll_dev)
-{
-	struct bma150_data *bma150 = ipoll_dev->private;
-
-	bma150_open(bma150);
-}
-
-static void bma150_poll_close(struct input_polled_dev *ipoll_dev)
-{
-	struct bma150_data *bma150 = ipoll_dev->private;
-
-	bma150_close(bma150);
-}
-
-static int __devinit bma150_initialize(struct bma150_data *bma150,
-				       const struct bma150_cfg *cfg)
-{
-	int error;
-
-	error = bma150_soft_reset(bma150);
-	if (error)
-		return error;
-
-	error = bma150_set_bandwidth(bma150, cfg->bandwidth);
-	if (error)
-		return error;
-
-	error = bma150_set_range(bma150, cfg->range);
-	if (error)
-		return error;
-
-	if (bma150->client->irq) {
-		error = bma150_set_any_motion_interrupt(bma150,
-					cfg->any_motion_int,
-					cfg->any_motion_dur,
-					cfg->any_motion_thres);
-		if (error)
-			return error;
-
-		error = bma150_set_high_g_interrupt(bma150,
-					cfg->hg_int, cfg->hg_hyst,
-					cfg->hg_dur, cfg->hg_thres);
-		if (error)
-			return error;
-
-		error = bma150_set_low_g_interrupt(bma150,
-					cfg->lg_int, cfg->lg_hyst,
-					cfg->lg_dur, cfg->lg_thres);
-		if (error)
-			return error;
-	}
-
-	return bma150_set_mode(bma150, BMA150_MODE_SLEEP);
-}
-
-static void __devinit bma150_init_input_device(struct bma150_data *bma150,
-						struct input_dev *idev)
-{
-	idev->name = BMA150_DRIVER;
-	idev->phys = BMA150_DRIVER "/input0";
-	idev->id.bustype = BUS_I2C;
-	idev->dev.parent = &bma150->client->dev;
-
-	idev->evbit[0] = BIT_MASK(EV_ABS);
-	input_set_abs_params(idev, ABS_X, ABSMIN_ACC_VAL, ABSMAX_ACC_VAL, 0, 0);
-	input_set_abs_params(idev, ABS_Y, ABSMIN_ACC_VAL, ABSMAX_ACC_VAL, 0, 0);
-	input_set_abs_params(idev, ABS_Z, ABSMIN_ACC_VAL, ABSMAX_ACC_VAL, 0, 0);
-}
-
-static int __devinit bma150_register_input_device(struct bma150_data *bma150)
-{
-	struct input_dev *idev;
-	int error;
-
-	idev = input_allocate_device();
-	if (!idev)
-		return -ENOMEM;
-
-	bma150_init_input_device(bma150, idev);
-
-	idev->open = bma150_irq_open;
-	idev->close = bma150_irq_close;
-	input_set_drvdata(idev, bma150);
-
-	error = input_register_device(idev);
-	if (error) {
-		input_free_device(idev);
-		return error;
-	}
-
-	bma150->input = idev;
-	return 0;
-}
-
-static int __devinit bma150_register_polled_device(struct bma150_data *bma150)
-{
-	struct input_polled_dev *ipoll_dev;
-	int error;
-
-	ipoll_dev = input_allocate_polled_device();
-	if (!ipoll_dev)
-		return -ENOMEM;
-
-	ipoll_dev->private = bma150;
-	ipoll_dev->open = bma150_poll_open;
-	ipoll_dev->close = bma150_poll_close;
-	ipoll_dev->poll = bma150_poll;
-	ipoll_dev->poll_interval = BMA150_POLL_INTERVAL;
-	ipoll_dev->poll_interval_min = BMA150_POLL_MIN;
-	ipoll_dev->poll_interval_max = BMA150_POLL_MAX;
-
-	bma150_init_input_device(bma150, ipoll_dev->input);
-
-	error = input_register_polled_device(ipoll_dev);
-	if (error) {
-		input_free_polled_device(ipoll_dev);
-		return error;
-	}
-
-	bma150->input_polled = ipoll_dev;
-	bma150->input = ipoll_dev->input;
-
-	return 0;
-}
-
-static int __devinit bma150_probe(struct i2c_client *client,
-				  const struct i2c_device_id *id)
-{
-	const struct bma150_platform_data *pdata = client->dev.platform_data;
-	const struct bma150_cfg *cfg;
-	struct bma150_data *bma150;
-	int chip_id;
-	int error;
-
-	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		dev_err(&client->dev, "i2c_check_functionality error\n");
-		return -EIO;
-	}
-
-	chip_id = i2c_smbus_read_byte_data(client, BMA150_CHIP_ID_REG);
-	if (chip_id != BMA150_CHIP_ID) {
-		dev_err(&client->dev, "BMA150 chip id error: %d\n", chip_id);
-		return -EINVAL;
-	}
-
-	bma150 = kzalloc(sizeof(struct bma150_data), GFP_KERNEL);
-	if (!bma150)
-		return -ENOMEM;
-
-	bma150->client = client;
-
-	if (pdata) {
-		if (pdata->irq_gpio_cfg) {
-			error = pdata->irq_gpio_cfg();
-			if (error) {
-				dev_err(&client->dev,
-					"IRQ GPIO conf. error %d, error %d\n",
-					client->irq, error);
-				goto err_free_mem;
-			}
-		}
-		cfg = &pdata->cfg;
-	} else {
-		cfg = &default_cfg;
-	}
-
-	error = bma150_initialize(bma150, cfg);
-	if (error)
-		goto err_free_mem;
-
-	if (client->irq > 0) {
-		error = bma150_register_input_device(bma150);
-		if (error)
-			goto err_free_mem;
-
-		error = request_threaded_irq(client->irq,
-					NULL, bma150_irq_thread,
-					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-					BMA150_DRIVER, bma150);
-		if (error) {
-			dev_err(&client->dev,
-				"irq request failed %d, error %d\n",
-				client->irq, error);
-			input_unregister_device(bma150->input);
-			goto err_free_mem;
-		}
-	} else {
-		error = bma150_register_polled_device(bma150);
-		if (error)
-			goto err_free_mem;
-	}
-
-	i2c_set_clientdata(client, bma150);
-
-	pm_runtime_enable(&client->dev);
-
-	return 0;
-
-err_free_mem:
-	kfree(bma150);
-	return error;
-}
-
-static int __devexit bma150_remove(struct i2c_client *client)
-{
-	struct bma150_data *bma150 = i2c_get_clientdata(client);
-
-	pm_runtime_disable(&client->dev);
-
-	if (client->irq > 0) {
-		free_irq(client->irq, bma150);
-		input_unregister_device(bma150->input);
-	} else {
-		input_unregister_polled_device(bma150->input_polled);
-		input_free_polled_device(bma150->input_polled);
-	}
-
-	kfree(bma150);
-
-	return 0;
-}
-
-#ifdef CONFIG_PM
-static int bma150_suspend(struct device *dev)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct bma150_data *bma150 = i2c_get_clientdata(client);
-
-	return bma150_set_mode(bma150, BMA150_MODE_SLEEP);
-}
-
-static int bma150_resume(struct device *dev)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct bma150_data *bma150 = i2c_get_clientdata(client);
-
-	return bma150_set_mode(bma150, BMA150_MODE_NORMAL);
+	delay = dd->bma150_accl_mode * HZ / 1000;
+	/* Set delay >= 2 jiffies to avoid cpu hogging */
+	if (delay < 2)
+		delay = 2;
+	schedule_delayed_work(&dd->work_data, HZ / 1000);
+	if (atomic_read(&a_flag))
+		mod_timer(&bma_wakeup_timer, jiffies + delay);
 }
 #endif
 
-static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
+static int bma150_accl_open(struct input_dev *dev)
+{
+	int rc = 0;
+#ifdef BMA150_ACCL_IRQ_MODE
+	struct drv_data *dd = input_get_drvdata(dev);
 
-static const struct i2c_device_id bma150_id[] = {
-	{ "bma150", 0 },
-	{ "smb380", 0 },
-	{ "bma023", 0 },
-	{ }
+	if (!dd->irq)
+		return -1;
+	/* Timer based implementation */
+	/* does not require irq t be enabled */
+	rc = request_irq(dd->irq,
+			 &bma150_accl_irq, 0, ACCL_NAME, &dd->i2c->dev);
+#endif
+
+	return rc;
+}
+
+static void bma150_accl_release(struct input_dev *dev)
+{
+#ifdef BMA150_ACCL_IRQ_MODE
+	struct drv_data *dd = input_get_drvdata(dev);
+
+	/* Timer based implementation */
+	/* does not require irq t be enabled */
+	free_irq(dd->irq, &dd->i2c->dev);
+#endif
+
+	return;
+}
+
+static void bma150_accl_getdata(struct drv_data *dd)
+{
+	smb380acc_t acc;
+	int X, Y, Z;
+	struct bma150_accl_platform_data *pdata = pdata =
+	    bma150_accl_client->dev.platform_data;
+
+	mutex_lock(&bma150_accl_wrk_lock);
+#ifndef BMA150_ACCL_IRQ_MODE
+	if (!atomic_read(&bma_on)) {
+		bma150_accl_power_up(dd);
+		/* BMA150 need 2 to 3 ms delay */
+		/* to give valid data after wakeup */
+		msleep(2);
+	}
+#endif
+	smb380_read_accel_xyz(&acc);
+
+	switch (pdata->orientation) {
+	case BMA_ROT_90:
+		X = -acc.y;
+		Y = acc.x;
+		Z = acc.z;
+		break;
+	case BMA_ROT_180:
+		X = -acc.x;
+		Y = -acc.y;
+		Z = acc.z;
+		break;
+	case BMA_ROT_270:
+		X = acc.y;
+		Y = -acc.x;
+		Z = acc.z;
+		break;
+	default:
+		pr_err("bma150_accl: invalid orientation specified\n");
+	case BMA_NO_ROT:
+		X = acc.x;
+		Y = acc.y;
+		Z = acc.z;
+		break;
+	}
+	if (pdata->invert) {
+		X = -X;
+		Z = -Z;
+	}
+	input_report_rel(dd->ip_dev, REL_X, X);
+	input_report_rel(dd->ip_dev, REL_Y, Y);
+	input_report_rel(dd->ip_dev, REL_Z, Z);
+	input_sync(dd->ip_dev);
+
+	newacc.x = X;
+	newacc.y = Y;
+	newacc.z = Z;
+
+#ifndef BMA150_ACCL_IRQ_MODE
+	if (dd->bma150_accl_mode >= SENSOR_DELAY_UI)
+		bma150_accl_power_down(dd);
+#endif
+	mutex_unlock(&bma150_accl_wrk_lock);
+
+	return;
+
+}
+
+static void bma150_accl_work_f(struct work_struct *work)
+{
+	struct delayed_work *dwork =
+	    container_of(work, struct delayed_work, work);
+	struct drv_data *dd = container_of(dwork, struct drv_data, work_data);
+
+	bma150_accl_getdata(dd);
+
+}
+
+#ifdef BMA150_ACCL_IRQ_MODE
+static int __devinit bma150_accl_configuration(void)
+{
+	int ret;
+
+/* low-g interrupt config: 0.156g, 150ms */
+	ret = smb380_set_low_g_threshold((unsigned char)LOW_G_THRES);
+	if (ret < 0)
+		return ret;
+	ret = smb380_set_low_g_duration((unsigned char)LOW_G_DUR);
+	if (ret < 0)
+		return ret;
+
+/* high-g interrupt config: 1.50g, 150ms */
+	ret = smb380_set_high_g_threshold((unsigned char)HIGH_G_THRES);
+	if (ret < 0)
+		return ret;
+	ret = smb380_set_high_g_duration((unsigned char)HIGH_G_DUR);
+	if (ret < 0)
+		return ret;
+
+/* any motion interrupt config: 0.75g, 3 */
+	ret = smb380_set_any_motion_threshold((unsigned char)ANY_MOTION_THRES);
+	if (ret < 0)
+		return ret;
+	ret = smb380_set_any_motion_count((unsigned char)ANY_MOTION_CT);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+
+}
+
+static int bma150_accl_set_mode(void)
+{
+	int ret = 0;
+	struct drv_data *dd;
+	dd = i2c_get_clientdata(bma150_accl_client);
+
+	switch (dd->bma150_accl_mode) {
+	case SENSOR_DELAY_FASTEST:
+		/* BMA150 mode set to FASTEST (max sensitivity) */
+	case SENSOR_DELAY_GAME:
+		/* BMA150 mode set to GAME */
+		ret = smb380_set_any_motion_count(1);
+		if (ret < 0)
+			return ret;
+		ret = smb380_set_bandwidth(5);
+		if (ret < 0)
+			return ret;
+		break;
+
+	case SENSOR_DELAY_NORMAL:
+		/* BMA150 mode set to NORMAL */
+	case SENSOR_DELAY_UI:
+		/* BMA150 mode set to UI */
+	default:
+		ret = smb380_set_any_motion_count(2);
+		if (ret < 0)
+			return ret;
+		ret = smb380_set_bandwidth(3);
+		if (ret < 0)
+			return ret;
+		break;
+	}
+
+	return 0;
+}
+#endif
+
+static int bma150_accl_misc_open(struct inode *inode, struct file *file)
+{
+	int err;
+	err = nonseekable_open(inode, file);
+	if (err < 0)
+		return err;
+
+	file->private_data = inode->i_private;
+
+	return 0;
+}
+
+static int bma150_accl_misc_ioctl(struct inode *inode, struct file *file,
+				  unsigned int cmd, unsigned long arg)
+{
+	void __user *argp = (void __user *)arg;
+	int delay;
+	struct drv_data *dd;
+	dd = i2c_get_clientdata(bma150_accl_client);
+
+	switch (cmd) {
+	case BMA150_ACCL_IOCTL_GET_DELAY:
+		delay = dd->bma150_accl_mode;
+
+		if (copy_to_user(argp, &delay, sizeof(delay)))
+			return -EFAULT;
+		break;
+
+	case BMA150_ACCL_IOCTL_SET_DELAY:
+		if (copy_from_user(&delay, argp, sizeof(delay)))
+			return -EFAULT;
+		if (delay < 0 || delay > 200)
+			return -EINVAL;
+		dd->bma150_accl_mode = delay;
+#ifdef BMA150_ACCL_IRQ_MODE
+		bma150_accl_set_mode();
+#endif
+		break;
+	case BMA150_ACCL_IOCTL_SET_FLAG:
+		if (copy_from_user(&delay, argp, sizeof(delay)))
+			return -EFAULT;
+#ifdef BMA150_ACCL_IRQ_MODE
+		if (delay == 0)
+			bma150_accl_power_down(dd);
+		else if (delay == 1)
+			bma150_accl_power_up(dd);
+#else
+		if (delay == 1)
+			mod_timer(&bma_wakeup_timer, jiffies + HZ / 1000);
+		else if (delay == 0)
+			del_timer(&bma_wakeup_timer);
+#endif
+		else
+			return -EINVAL;
+		atomic_set(&a_flag, delay);
+		break;
+	case BMA150_ACCL_IOCTL_GET_DATA:
+		if (!atomic_read(&a_flag))
+			bma150_accl_getdata(dd);
+		if (copy_to_user(argp, &newacc, sizeof(newacc)))
+			return -EFAULT;
+		break;
+	}
+
+	return 0;
+}
+
+static const struct file_operations bma150_accl_misc_fops = {
+	.owner = THIS_MODULE,
+	.open = bma150_accl_misc_open,
+	.ioctl = bma150_accl_misc_ioctl,
 };
 
-MODULE_DEVICE_TABLE(i2c, bma150_id);
+static struct miscdevice bma150_accl_misc_device = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "bma150_accl",
+	.fops = &bma150_accl_misc_fops,
+};
 
-static struct i2c_driver bma150_driver = {
+static int __devinit bma150_accl_probe(struct i2c_client *client,
+				       const struct i2c_device_id *id)
+{
+	struct drv_data *dd;
+	int rc = 0;
+	struct bma150_accl_platform_data *pdata = pdata =
+	    client->dev.platform_data;
+
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+		pr_err("i2c_check_functionality error\n");
+		goto probe_exit;
+	}
+	dd = kzalloc(sizeof(struct drv_data), GFP_KERNEL);
+	if (!dd) {
+		rc = -ENOMEM;
+		goto probe_exit;
+	}
+	bma150_accl_client = client;
+
+	mutex_lock(&bma150_accl_dd_lock);
+	list_add_tail(&dd->next_dd, &dd_list);
+	mutex_unlock(&bma150_accl_dd_lock);
+	INIT_DELAYED_WORK(&dd->work_data, bma150_accl_work_f);
+	dd->i2c = client;
+
+	if (pdata && pdata->init) {
+		rc = pdata->init(&client->dev);
+		if (rc)
+			goto probe_err_cfg;
+	}
+
+	dd->ip_dev = input_allocate_device();
+	if (!dd->ip_dev) {
+		rc = -ENOMEM;
+		goto probe_err_reg;
+	}
+	input_set_drvdata(dd->ip_dev, dd);
+	dd->irq = client->irq;
+	dd->ip_dev->open = bma150_accl_open;
+	dd->ip_dev->close = bma150_accl_release;
+	dd->ip_dev->name = ACCL_NAME;
+	dd->ip_dev->phys = ACCL_NAME;
+	dd->ip_dev->id.vendor = ACCL_VENDORID;
+	dd->ip_dev->id.product = 1;
+	dd->ip_dev->id.version = 1;
+	set_bit(EV_REL, dd->ip_dev->evbit);
+	set_bit(REL_X, dd->ip_dev->relbit);
+	set_bit(REL_Y, dd->ip_dev->relbit);
+	set_bit(REL_Z, dd->ip_dev->relbit);
+	rc = input_register_device(dd->ip_dev);
+	if (rc) {
+		dev_err(&dd->ip_dev->dev,
+			"bma150_accl_probe: input_register_device rc=%d\n", rc);
+		goto probe_err_reg_dev;
+	}
+	rc = misc_register(&bma150_accl_misc_device);
+	if (rc < 0) {
+		dev_err(&client->dev, "bma150 misc_device register failed\n");
+		goto probe_err_reg_misc;
+	}
+	/* bma150 sensor initial */
+	dd->smb380.bus_write = bma150_accl_i2c_write;
+	dd->smb380.bus_read = bma150_accl_i2c_read;
+	dd->smb380.delay_msec = bma150_accl_i2c_delay;
+	rc = smb380_init(&dd->smb380);
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_smbcfg;
+	}
+	/* verify chip id */
+	if ((dd->smb380).chip_id != 2) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Device not found \n");
+		goto probe_err_smbcfg;
+	}
+	rc = smb380_set_range(0);	/* range + /-2G */
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_smbcfg;
+	}
+	/* close all interrupt */
+	rc = smb380_set_low_g_int(0);
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_smbcfg;
+	}
+	rc = smb380_set_high_g_int(0);
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_smbcfg;
+	}
+#ifdef BMA150_ACCL_IRQ_MODE
+	rc = smb380_set_any_motion_int(1);
+#else
+	rc = smb380_set_any_motion_int(0);
+#endif
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_smbcfg;
+	}
+	rc = smb380_set_alert_int(0);
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_smbcfg;
+	}
+#ifdef BMA150_ACCL_IRQ_MODE
+	rc = smb380_set_advanced_int(1);
+#else
+	rc = smb380_set_advanced_int(0);
+#endif
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_smbcfg;
+	}
+	rc = smb380_reset_interrupt();
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_smbcfg;
+	}
+#ifndef BMA150_ACCL_IRQ_MODE
+	rc = smb380_set_new_data_int(1);
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe : \
+				Error configuring device rc\n");
+		goto probe_err_smbcfg;
+	}
+#endif
+
+	dd->bma150_accl_mode = 200;	/* NORMAL Mode */
+	i2c_set_clientdata(client, dd);
+#ifdef BMA150_ACCL_IRQ_MODE
+	rc = bma150_accl_configuration();
+	rc = bma150_accl_set_mode();
+	if (rc < 0) {
+		dev_err(&dd->ip_dev->dev, "bma150_accl_probe: \
+				Error configuring device rc=%d\n", rc);
+		goto probe_err_setmode;
+	}
+#else
+	setup_timer(&bma_wakeup_timer, bma_wakeup_timer_func, (long)dd);
+#endif
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	dd->suspend_desc.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+	dd->suspend_desc.suspend = bma150_accl_early_suspend,
+	dd->suspend_desc.resume = bma150_accl_late_resume,
+	register_early_suspend(&dd->suspend_desc);
+#endif
+
+	return rc;
+#ifdef BMA150_ACCL_IRQ_MODE
+probe_err_setmode:
+	i2c_set_clientdata(client, NULL);
+#endif
+probe_err_smbcfg:
+	misc_deregister(&bma150_accl_misc_device);
+probe_err_reg_misc:
+	input_unregister_device(dd->ip_dev);
+probe_err_reg_dev:
+	input_free_device(dd->ip_dev);
+	dd->ip_dev = NULL;
+probe_err_reg:
+	if (pdata && pdata->exit)
+		pdata->exit(&client->dev);
+probe_err_cfg:
+	mutex_lock(&bma150_accl_dd_lock);
+	list_del(&dd->next_dd);
+	mutex_unlock(&bma150_accl_dd_lock);
+	kfree(dd);
+probe_exit:
+	return rc;
+}
+
+static int __devexit bma150_accl_remove(struct i2c_client *client)
+{
+	struct drv_data *dd;
+	struct bma150_accl_platform_data *pdata = pdata =
+	    client->dev.platform_data;
+	int rc;
+	const char *devname;
+
+	dd = i2c_get_clientdata(client);
+	devname = dd->ip_dev->phys;
+
+	rc = bma150_accl_power_down(dd);
+	if (rc)
+		dev_err(&dd->ip_dev->dev,
+			"%s: power down failed with error %d\n", __func__, rc);
+#ifdef BMA150_ACCL_IRQ_MODE
+	free_irq(dd->irq, &dd->i2c->dev);
+#else
+	del_timer(&bma_wakeup_timer);
+#endif
+	misc_deregister(&bma150_accl_misc_device);
+	input_unregister_device(dd->ip_dev);
+	i2c_set_clientdata(client, NULL);
+	if (pdata && pdata->exit)
+		pdata->exit(&client->dev);
+	mutex_lock(&bma150_accl_dd_lock);
+	list_del(&dd->next_dd);
+	mutex_unlock(&bma150_accl_dd_lock);
+	kfree(devname);
+	kfree(dd);
+
+	return 0;
+}
+
+static struct i2c_device_id bma150_accl_idtable[] = {
+	{"bma150_accl", 0},
+	{}
+};
+
+MODULE_DEVICE_TABLE(i2c, bma150_accl_idtable);
+
+static struct i2c_driver bma150_accl_driver = {
 	.driver = {
-		.owner	= THIS_MODULE,
-		.name	= BMA150_DRIVER,
-		.pm	= &bma150_pm,
-	},
-	.class		= I2C_CLASS_HWMON,
-	.id_table	= bma150_id,
-	.probe		= bma150_probe,
-	.remove		= __devexit_p(bma150_remove),
+		   .name = ACCL_NAME,
+		   .owner = THIS_MODULE,
+		   },
+	.id_table = bma150_accl_idtable,
+	.probe = bma150_accl_probe,
+	.remove = __devexit_p(bma150_accl_remove),
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	.suspend = bma150_accl_suspend,
+	.resume = bma150_accl_resume,
+#endif
 };
 
-static int __init BMA150_init(void)
+static int __init bma150_accl_init(void)
 {
-	return i2c_add_driver(&bma150_driver);
+	INIT_LIST_HEAD(&dd_list);
+	mutex_init(&bma150_accl_dd_lock);
+	mutex_init(&bma150_accl_wrk_lock);
+
+	return i2c_add_driver(&bma150_accl_driver);
 }
 
-static void __exit BMA150_exit(void)
+module_init(bma150_accl_init);
+
+static void __exit bma150_accl_exit(void)
 {
-	i2c_del_driver(&bma150_driver);
+	i2c_del_driver(&bma150_accl_driver);
 }
 
-MODULE_AUTHOR("Albert Zhang <xu.zhang@bosch-sensortec.com>");
-MODULE_DESCRIPTION("BMA150 driver");
-MODULE_LICENSE("GPL");
-
-module_init(BMA150_init);
-module_exit(BMA150_exit);
+module_exit(bma150_accl_exit);

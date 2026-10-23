@@ -4,6 +4,10 @@
 
 ccflags-$(CONFIG_SPI_DEBUG) := -DDEBUG
 
+ifeq ($(CONFIG_ATHENA),y)
+EXTRA_CFLAGS                += -D_ATHENA_
+endif
+
 # small core, mostly translating board-specific
 # config declarations into driver model code
 obj-$(CONFIG_SPI_MASTER)		+= spi.o
@@ -58,4 +62,9 @@ obj-$(CONFIG_SPI_TLE62X0)		+= spi-tle62x0.o
 obj-$(CONFIG_SPI_TOPCLIFF_PCH)		+= spi-topcliff-pch.o
 obj-$(CONFIG_SPI_TXX9)			+= spi-txx9.o
 obj-$(CONFIG_SPI_XILINX)		+= spi-xilinx.o
+ifdef CONFIG_OSDAL_SUPPORT
+obj-$(CONFIG_SPI_BCM21XX)       += spi_bcm21xx_osdal.o
+else
+obj-$(CONFIG_SPI_BCM21XX)		+= spi_bcm21xx.o
+endif
 

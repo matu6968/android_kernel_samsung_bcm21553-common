@@ -59,6 +59,9 @@ source "drivers/staging/rts_pstor/Kconfig"
 source "drivers/staging/rts5139/Kconfig"
 
 source "drivers/staging/frontier/Kconfig"
+source "drivers/staging/android/Kconfig"
+
+
 
 source "drivers/staging/pohmelfs/Kconfig"
 
@@ -89,6 +92,7 @@ source "drivers/staging/sep/Kconfig"
 source "drivers/staging/iio/Kconfig"
 
 source "drivers/staging/zram/Kconfig"
+source "drivers/staging/zsmalloc/Kconfig"
 
 source "drivers/staging/zcache/Kconfig"
 
@@ -132,4 +136,7 @@ source "drivers/staging/nvec/Kconfig"
 
 source "drivers/staging/media/Kconfig"
 
+source "drivers/staging/bcm21553/Kconfig"
+
+endif # !STAGING_EXCLUDE_BUILD
 endif # STAGING
