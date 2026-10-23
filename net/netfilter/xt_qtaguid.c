@@ -35,7 +35,9 @@
 #include "xt_qtaguid_internal.h"
 #include "xt_qtaguid_print.h"
 
+#ifndef pr_warn_once
 #define pr_warn_once printk
+#endif
 /*
  * We only use the xt_socket funcs within a similar context to avoid unexpected
  * return values.

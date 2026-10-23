@@ -7389,7 +7389,7 @@
       "vendor": "0bc49228f999d5bbcccec068f7a3f3161215b0e7",
       "upstream": "56a8b2005bdace6eb51fe500a040dc13f38c24b8",
       "status": "adapted",
-      "ported_blob": "344090a6f0763cdcf87f18e483a53ccc00278af9",
+      "ported_blob": "90c713c3e8326aad0c4190e8e9d588273b7a7b60",
       "reason": "Retain Broadcom MLC command selection with upstream brace/flow changes.",
       "base_blob": "26caf2590dae1c55ee161f64854c467934164f95"
     },
@@ -25990,7 +25990,7 @@
       "vendor": "212d09a6ee1709b3d037fdfe5ecd773fe9464c8e",
       "upstream": null,
       "status": "adapted",
-      "ported_blob": "1a478157e4bf924c869470097539a53e9073b82b",
+      "ported_blob": "3d71aaf2d08235a8389368875b5a029c7af6b3e3",
       "reason": "Retain downstream changes with upstream updates and the required 2.6.39 API/configuration adaptations.",
       "base_blob": null
     },
