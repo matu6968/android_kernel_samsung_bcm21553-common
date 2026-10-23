@@ -60,6 +60,7 @@
 #include <linux/eventfd.h>
 #include <linux/poll.h>
 #include <linux/flex_array.h> /* used in cgroup_attach_proc */
+#include <linux/capability.h>
 
 #include <linux/atomic.h>
 
@@ -1817,6 +1818,27 @@ static int cgroup_task_migrate(struct cgroup *cgrp, struct cgroup *oldcgrp,
 	return 0;
 }
 
+/*
+ * Android: attach permissions are not checked by attach_task_by_pid().
+ * Subsystems that implement can_attach() decide for themselves; for the
+ * others, require CAP_SYS_ADMIN or a matching uid.
+ */
+static int cgroup_generic_attach_permission(struct task_struct *tsk)
+{
+	const struct cred *cred = current_cred(), *tcred;
+	int ret = 0;
+
+	if (capable(CAP_SYS_ADMIN))
+		return 0;
+
+	rcu_read_lock();
+	tcred = __task_cred(tsk);
+	if (cred->euid != tcred->uid && cred->euid != tcred->suid)
+		ret = -EACCES;
+	rcu_read_unlock();
+	return ret;
+}
+
 /**
  * cgroup_attach_task - attach task 'tsk' to cgroup 'cgrp'
  * @cgrp: the cgroup the task is attaching to
@@ -1847,6 +1869,12 @@ int cgroup_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
 				 * against the subsystems whose can_attach()
 				 * succeeded. (See below)
 				 */
+				failed_ss = ss;
+				goto out;
+			}
+		} else {
+			retval = cgroup_generic_attach_permission(tsk);
+			if (retval) {
 				failed_ss = ss;
 				goto out;
 			}
@@ -2077,6 +2105,12 @@ int cgroup_attach_proc(struct cgroup *cgrp, struct task_struct *leader)
 				failed_ss = ss;
 				goto out_cancel_attach;
 			}
+		} else {
+			retval = cgroup_generic_attach_permission(leader);
+			if (retval) {
+				failed_ss = ss;
+				goto out_cancel_attach;
+			}
 		}
 		/* a callback to be run on every thread in the threadgroup. */
 		if (ss->can_attach_task) {
@@ -2206,7 +2240,6 @@ out_free_group_list:
 static int attach_task_by_pid(struct cgroup *cgrp, u64 pid, bool threadgroup)
 {
 	struct task_struct *tsk;
-	const struct cred *cred = current_cred(), *tcred;
 	int ret;
 
 	if (!cgroup_lock_live_group(cgrp))
@@ -2233,19 +2266,6 @@ static int attach_task_by_pid(struct cgroup *cgrp, u64 pid, bool threadgroup)
 			rcu_read_unlock();
 			cgroup_unlock();
 			return -ESRCH;
-		}
-
-		/*
-		 * even if we're attaching all tasks in the thread group, we
-		 * only need to check permissions on one of them.
-		 */
-		tcred = __task_cred(tsk);
-		if (cred->euid &&
-		    cred->euid != tcred->uid &&
-		    cred->euid != tcred->suid) {
-			rcu_read_unlock();
-			cgroup_unlock();
-			return -EACCES;
 		}
 		get_task_struct(tsk);
 		rcu_read_unlock();

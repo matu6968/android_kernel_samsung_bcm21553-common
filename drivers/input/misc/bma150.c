@@ -33,7 +33,7 @@
 #include <linux/slab.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
-#include <linux/bma150.h>
+#include <linux/input/bma150.h>
 
 #define ABSMAX_ACC_VAL		0x01FF
 #define ABSMIN_ACC_VAL		-(ABSMAX_ACC_VAL)

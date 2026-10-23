@@ -25,8 +25,7 @@
 
 #include <mach/bcm21553_cpufreq_gov.h>
 
-#define dprintk(msg...) \
-	cpufreq_debug_printk(CPUFREQ_DEBUG_GOVERNOR, "bcm21553", msg)
+#define dprintk(msg...) pr_debug("bcm21553: " msg)
 
 /* BCM21553 governor private data */
 struct bcm_cpufreq_gov_info {
