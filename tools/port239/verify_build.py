@@ -53,6 +53,7 @@ def verify(source, build, device, aoa):
                  'NETFILTER_XT_MATCH_QTAGUID', 'USB_ANDROID', 'USB_GADGET_DWC_OTG',
                  'NET_IPGRE', 'NETFILTER_XT_MATCH_ADDRTYPE', 'CRYPTO_MD4']:
         require(cfg.get('CONFIG_' + name) == 'y', f'Missing required feature: {name}')
+    require(cfg.get('CONFIG_CRYPTO_MANAGER_DISABLE_TESTS') == 'n', 'Crypto self-tests disabled')
     require(cfg.get('CONFIG_BOARD_' + device.upper()) == 'y', 'Wrong board')
     require(cfg.get('CONFIG_SDRAM_BASE_ADDR') == '0x81600000', 'SDRAM base changed')
     require(cfg.get('CONFIG_AUTO_ZRELADDR') == 'n', 'Use the explicit vendor load address')
