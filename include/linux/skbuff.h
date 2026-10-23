@@ -50,6 +50,7 @@
 #define SKB_TRUESIZE(X) ((X) +						\
 			 SKB_DATA_ALIGN(sizeof(struct sk_buff)) +	\
 			 SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
+#define SKB_NETPOLL_SIGNATURE	0x12345678
 
 /* A. Checksumming of received packets by device.
  *
@@ -463,6 +464,7 @@ struct sk_buff {
 	sk_buff_data_t		transport_header;
 	sk_buff_data_t		network_header;
 	sk_buff_data_t		mac_header;
+	unsigned int		netpoll_signature;
 	/* These elements must be at the end, see alloc_skb() for details.  */
 	sk_buff_data_t		tail;
 	sk_buff_data_t		end;
@@ -1990,7 +1992,7 @@ static inline int skb_cow_head(struct sk_buff *skb, unsigned int headroom)
  *	is untouched. Otherwise it is extended. Returns zero on
  *	success. The skb is freed on error.
  */
- 
+
 static inline int skb_padto(struct sk_buff *skb, unsigned int len)
 {
 	unsigned int size = skb->len;
@@ -2620,3 +2622,4 @@ static inline bool skb_is_recycleable(const struct sk_buff *skb, int skb_size)
 }
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */
+

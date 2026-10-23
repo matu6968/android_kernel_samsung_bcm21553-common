@@ -249,32 +249,6 @@ static inline int rfcomm_check_security(struct rfcomm_dlc *d)
 	return hci_conn_security(conn->hcon, d->sec_level, auth_type);
 }
 
-static void rfcomm_session_timeout(unsigned long arg)
-{
-	struct rfcomm_session *s = (void *) arg;
-
-	BT_DBG("session %p state %ld", s, s->state);
-
-	set_bit(RFCOMM_TIMED_OUT, &s->flags);
-	rfcomm_schedule();
-}
-
-static void rfcomm_session_set_timer(struct rfcomm_session *s, long timeout)
-{
-	BT_DBG("session %p state %ld timeout %ld", s, s->state, timeout);
-
-	if (!mod_timer(&s->timer, jiffies + timeout))
-		rfcomm_session_hold(s);
-}
-
-static void rfcomm_session_clear_timer(struct rfcomm_session *s)
-{
-	BT_DBG("session %p state %ld", s, s->state);
-
-	if (timer_pending(&s->timer) && del_timer(&s->timer))
-		rfcomm_session_put(s);
-}
-
 /* ---- RFCOMM DLCs ---- */
 static void rfcomm_dlc_timeout(unsigned long arg)
 {
@@ -352,7 +326,6 @@ static void rfcomm_dlc_link(struct rfcomm_session *s, struct rfcomm_dlc *d)
 
 	rfcomm_session_hold(s);
 
-	rfcomm_session_clear_timer(s);
 	rfcomm_dlc_hold(d);
 	list_add(&d->list, &s->dlcs);
 	d->session = s;
@@ -367,9 +340,6 @@ static void rfcomm_dlc_unlink(struct rfcomm_dlc *d)
 	list_del(&d->list);
 	d->session = NULL;
 	rfcomm_dlc_put(d);
-
-	if (list_empty(&s->dlcs))
-		rfcomm_session_set_timer(s, RFCOMM_IDLE_TIMEOUT);
 
 	rfcomm_session_put(s);
 }
@@ -464,7 +434,6 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
 
 	switch (d->state) {
 	case BT_CONNECT:
-	case BT_CONFIG:
 		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
 			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
 			rfcomm_schedule();
@@ -484,7 +453,6 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
 		break;
 
 	case BT_OPEN:
-	case BT_CONNECT2:
 		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
 			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
 			rfcomm_schedule();
@@ -603,8 +571,6 @@ static struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state)
 
 	BT_DBG("session %p sock %p", s, sock);
 
-	setup_timer(&s->timer, rfcomm_session_timeout, (unsigned long) s);
-
 	INIT_LIST_HEAD(&s->dlcs);
 	s->state = state;
 	s->sock  = sock;
@@ -636,7 +602,6 @@ static void rfcomm_session_del(struct rfcomm_session *s)
 	if (state == BT_CONNECTED)
 		rfcomm_send_disc(s, 0);
 
-	rfcomm_session_clear_timer(s);
 	sock_release(s->sock);
 	kfree(s);
 
@@ -678,7 +643,6 @@ static void rfcomm_session_close(struct rfcomm_session *s, int err)
 		__rfcomm_dlc_close(d, err);
 	}
 
-	rfcomm_session_clear_timer(s);
 	rfcomm_session_put(s);
 }
 
@@ -1247,8 +1211,6 @@ void rfcomm_dlc_accept(struct rfcomm_dlc *d)
 
 	rfcomm_send_ua(d->session, d->dlci);
 
-	rfcomm_dlc_clear_timer(d);
-
 	rfcomm_dlc_lock(d);
 	d->state = BT_CONNECTED;
 	d->state_change(d, 0);
@@ -1266,11 +1228,6 @@ static void rfcomm_check_accept(struct rfcomm_dlc *d)
 		if (d->defer_setup) {
 			set_bit(RFCOMM_DEFER_SETUP, &d->flags);
 			rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
-
-			rfcomm_dlc_lock(d);
-			d->state = BT_CONNECT2;
-			d->state_change(d, 0);
-			rfcomm_dlc_unlock(d);
 		} else
 			rfcomm_dlc_accept(d);
 	} else {
@@ -1817,11 +1774,6 @@ static inline void rfcomm_process_dlcs(struct rfcomm_session *s)
 				if (d->defer_setup) {
 					set_bit(RFCOMM_DEFER_SETUP, &d->flags);
 					rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
-
-					rfcomm_dlc_lock(d);
-					d->state = BT_CONNECT2;
-					d->state_change(d, 0);
-					rfcomm_dlc_unlock(d);
 				} else
 					rfcomm_dlc_accept(d);
 			}
@@ -1940,13 +1892,6 @@ static inline void rfcomm_process_sessions(void)
 	list_for_each_safe(p, n, &session_list) {
 		struct rfcomm_session *s;
 		s = list_entry(p, struct rfcomm_session, list);
-
-		if (test_and_clear_bit(RFCOMM_TIMED_OUT, &s->flags)) {
-			s->state = BT_DISCONN;
-			rfcomm_send_disc(s, 0);
-			rfcomm_session_put(s);
-			continue;
-		}
 
 		if (s->state == BT_LISTEN) {
 			rfcomm_accept_connection(s);
