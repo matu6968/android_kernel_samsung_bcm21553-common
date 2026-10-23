@@ -110,6 +110,11 @@
  */
 #define lower_32_bits(n) ((u32)(n))
 
+extern int brcm_console_brcm_printk[];
+#define brcm_console_loglevel (brcm_console_brcm_printk[0])
+#define default_brcm_message_loglevel (brcm_console_brcm_printk[1])
+#define minimum_brcm_console_loglevel (brcm_console_brcm_printk[2])
+#define default_brcm_console_loglevel (brcm_console_brcm_printk[3])
 struct completion;
 struct pt_regs;
 struct user;
@@ -290,6 +295,17 @@ extern int func_ptr_is_kernel_text(void *ptr);
 struct pid;
 extern struct pid *session_of_pgrp(struct pid *pgrp);
 
+#ifdef CONFIG_PRINTK
+asmlinkage int brcm_vprintk(const char *fmt, va_list args) __attribute__((format(printf, 1, 0)));
+asmlinkage int brcm_printk(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+extern int brcm_klogging(char *data, int length);
+extern void brcm_current_netcon_status(unsigned char status);
+#else
+static inline int brcm_vprintk(const char *fmt, va_list args) { return 0; }
+static inline int brcm_printk(const char *fmt, ...) { return 0; }
+static inline int brcm_klogging(char *data, int length) { return 0; }
+static inline void brcm_current_netcon_status(unsigned char status) {}
+#endif
 unsigned long int_sqrt(unsigned long);
 
 extern void bust_spinlocks(int yes);
