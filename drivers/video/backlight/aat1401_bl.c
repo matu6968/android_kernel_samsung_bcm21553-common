@@ -439,6 +439,7 @@ static int aat1401_backlight_probe(struct platform_device *pdev)
     
 	memset(&props, 0, sizeof(struct backlight_properties));
 	props.max_brightness = data->max_brightness;
+	props.type = BACKLIGHT_RAW;
 
 	bl = backlight_device_register(pdev->name, &pdev->dev,
 			aat1401, &aat1401_backlight_ops, &props);
