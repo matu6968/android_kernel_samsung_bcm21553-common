@@ -402,6 +402,9 @@ static int l2cap_sock_getsockopt_old(struct socket *sock, int optname, char __us
 		if (chan->force_reliable)
 			opt |= L2CAP_LM_RELIABLE;
 
+		if (chan->flushable == BT_FLUSHABLE_ON)
+			opt |= L2CAP_LM_FLUSHABLE;
+
 		if (put_user(opt, (u32 __user *) optval))
 			err = -EFAULT;
 		break;
@@ -570,6 +573,8 @@ static int l2cap_sock_setsockopt_old(struct socket *sock, int optname, char __us
 
 		chan->role_switch    = (opt & L2CAP_LM_MASTER);
 		chan->force_reliable = (opt & L2CAP_LM_RELIABLE);
+		chan->flushable = (opt & L2CAP_LM_FLUSHABLE) ?
+				BT_FLUSHABLE_ON : BT_FLUSHABLE_OFF;
 		break;
 
 	default:

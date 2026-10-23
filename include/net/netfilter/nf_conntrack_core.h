@@ -77,3 +77,4 @@ print_tuple(struct seq_file *s, const struct nf_conntrack_tuple *tuple,
 extern spinlock_t nf_conntrack_lock ;
 
 #endif /* _NF_CONNTRACK_CORE_H */
+
