@@ -366,9 +366,17 @@ static ssize_t mmc328x_show(struct device *dev, struct device_attribute *attr, c
 
 static DEVICE_ATTR(mmc328x, S_IRUGO, mmc328x_show, NULL);
 
+/* Replace the removed legacy ioctl BKL serialization. */
+static DEFINE_MUTEX(mmc328x_ioctl_lock);
+
 static long mmc328x_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	return mmc328x_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	long result;
+	if (mutex_lock_interruptible(&mmc328x_ioctl_lock))
+		return -ERESTARTSYS;
+	result = mmc328x_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	mutex_unlock(&mmc328x_ioctl_lock);
+	return result;
 }
 
 static struct file_operations mmc328x_fops = {

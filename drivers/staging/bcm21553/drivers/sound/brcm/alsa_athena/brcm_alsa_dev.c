@@ -12,6 +12,7 @@ the GPL, without Broadcom's express prior written consent.
 *******************************************************************************************/
 
 
+#include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/init.h>
 #include <linux/jiffies.h>
@@ -1322,9 +1323,17 @@ static struct platform_driver sgPlatformDriver =
 		},
 };
 
+/* Replace the removed legacy ioctl BKL serialization. */
+static DEFINE_MUTEX(audio_ioctl_lock);
+
 static long BCMPCG_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	return BCMPCG_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	long result;
+	if (mutex_lock_interruptible(&audio_ioctl_lock))
+		return -ERESTARTSYS;
+	result = BCMPCG_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	mutex_unlock(&audio_ioctl_lock);
+	return result;
 }
 
 static struct file_operations bcmpcg_fops =
@@ -1338,7 +1347,12 @@ static struct file_operations bcmpcg_fops =
 
 static long BCMVOIP_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	return BCMVOIP_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	long result;
+	if (mutex_lock_interruptible(&audio_ioctl_lock))
+		return -ERESTARTSYS;
+	result = BCMVOIP_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	mutex_unlock(&audio_ioctl_lock);
+	return result;
 }
 
 static struct file_operations bcmvoip_fops =
@@ -1361,7 +1375,12 @@ static struct class *audlog_class;
 // File operations for audio logging
 static long BCMLOG_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	return BCMLOG_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	long result;
+	if (mutex_lock_interruptible(&audio_ioctl_lock))
+		return -ERESTARTSYS;
+	result = BCMLOG_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	mutex_unlock(&audio_ioctl_lock);
+	return result;
 }
 
 static struct file_operations bcmlog_fops =
