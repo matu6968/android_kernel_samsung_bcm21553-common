@@ -36,3 +36,6 @@ obj-$(CONFIG_CHARGER_ISP1704)	+= isp1704_charger.o
 obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
 obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
 obj-$(CONFIG_CHARGER_GPIO)	+= gpio-charger.o
+obj-$(CONFIG_BCM59035_POWER)    += bcm59035-power.o
+obj-$(CONFIG_BCM59038_POWER)    += bcm59038-power.o
+obj-$(CONFIG_MAX8986_POWER)	+= max8986-power.o
