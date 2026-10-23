@@ -712,7 +712,7 @@
       "vendor": "403aa9a4800bf69340028e5b3e10b12f2d896689",
       "upstream": null,
       "status": "adapted",
-      "ported_blob": "84f83aef619cd7c5bc8550e8af27b6d5c58bcd46",
+      "ported_blob": "3af0382849843502b88bcc4b3a34cb5f91658f9d",
       "reason": "Retain downstream changes with upstream updates and the required 2.6.39 API/configuration adaptations.",
       "base_blob": null
     },
@@ -723,7 +723,7 @@
       "vendor": "c556ce133a70f3007ac46d080055a15a604cc19f",
       "upstream": null,
       "status": "adapted",
-      "ported_blob": "bf550d80521039516ef72840478b235c4b9cd76c",
+      "ported_blob": "04f108d1b439bc5fbc76eb9f9197e53e4bffb1ca",
       "reason": "Retain downstream changes with upstream updates and the required 2.6.39 API/configuration adaptations.",
       "base_blob": null
     },
@@ -734,7 +734,7 @@
       "vendor": "483dd5c145425d036c350114404b637c7279617f",
       "upstream": null,
       "status": "adapted",
-      "ported_blob": "2459d6ec07db11405bab58ca3e89df590085a97d",
+      "ported_blob": "1c491698ad37646a149ddb125c5e777fbf28665c",
       "reason": "Retain downstream changes with upstream updates and the required 2.6.39 API/configuration adaptations.",
       "base_blob": null
     },
