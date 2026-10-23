@@ -21,6 +21,7 @@
 #include <linux/device.h>
 #include <linux/bootmem.h>
 #include <linux/memblock.h>
+#include <linux/vmalloc.h>
 #include <mach/setup.h>
 #include <asm/setup.h>
 #include <linux/dma-mapping.h>
@@ -242,11 +243,21 @@ int bcm21553_l2_evt_buf_init(void)
 		return -ENOMEM;
 	}
 
-	l2_evt_virt_buf = (u32)ioremap_wc(l2_evt_phys_buf, 4);
-	if (!l2_evt_virt_buf) {
-		pr_err("%s: ioremap_wc for L2 evict buf failed\n",
-			__func__);
-		return -ENOMEM;
+	/*
+	 * ioremap() refuses RAM pages since 2.6.39 (ARMv6 aliasing), and the
+	 * L2 cache maintenance code dereferences l2_evt_virt_buf, so a NULL
+	 * here faults on the next outer-cache operation. vmap() accepts RAM
+	 * and gives the same write-combined (normal, non-cacheable) mapping.
+	 */
+	{
+		struct page *pg = pfn_to_page(__phys_to_pfn(l2_evt_phys_buf));
+		void *va = vmap(&pg, 1, VM_MAP, pgprot_writecombine(PAGE_KERNEL));
+
+		if (!va) {
+			pr_err("%s: vmap for L2 evict buf failed\n", __func__);
+			return -ENOMEM;
+		}
+		l2_evt_virt_buf = (u32)va + (l2_evt_phys_buf & ~PAGE_MASK);
 	}
 
 	return 0;
