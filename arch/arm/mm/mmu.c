@@ -417,6 +417,9 @@ static void __init build_mem_type_table(void)
 		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
 		mem_types[MT_MEMORY_NONCACHED].prot_pte |= L_PTE_SHARED;
 	}
+#if defined(CONFIG_ARCH_BCM215XX)
+	mem_types[MT_MEMORY].prot_sect |= PMD_SECT_TEX(5);
+#endif
 	/*
 	 * ARMv6 and above have extended page tables.
 	 */

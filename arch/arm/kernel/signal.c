@@ -688,8 +688,18 @@ static void do_signal(struct pt_regs *regs, int syscall)
 		case -ERESTARTNOHAND:
 		case -ERESTARTSYS:
 		case -ERESTARTNOINTR:
-			regs->ARM_r0 = regs->ARM_ORIG_r0;
-			regs->ARM_pc = restart_addr;
+			/* Preserve the downstream guard against restarting an argument
+			 * which itself looks like an internal restart error. */
+			if (regs->ARM_ORIG_r0 == -ERESTARTNOHAND ||
+			    regs->ARM_ORIG_r0 == -ERESTARTSYS ||
+			    regs->ARM_ORIG_r0 == -ERESTARTNOINTR ||
+			    regs->ARM_ORIG_r0 == -ERESTART_RESTARTBLOCK) {
+				regs->ARM_r0 = -EINTR;
+				retval = -EINTR;
+			} else {
+				regs->ARM_r0 = regs->ARM_ORIG_r0;
+				regs->ARM_pc = restart_addr;
+			}
 			break;
 		case -ERESTART_RESTARTBLOCK:
 			regs->ARM_r0 = -EINTR;
@@ -748,6 +758,7 @@ static void do_signal(struct pt_regs *regs, int syscall)
 		 */
 		if (retval == -ERESTART_RESTARTBLOCK
 		    && regs->ARM_pc == continue_addr) {
+			regs->ARM_r0 = -EAGAIN; /* prevent repeated restarts */
 			if (thumb_mode(regs)) {
 				regs->ARM_r7 = __NR_restart_syscall - __NR_SYSCALL_BASE;
 				regs->ARM_pc -= 2;

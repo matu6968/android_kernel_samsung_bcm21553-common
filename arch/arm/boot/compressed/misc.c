@@ -170,6 +170,14 @@ asmlinkage void __div0(void)
 extern int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x));
 
 
+static void putstrdummy(const char *ptr)
+{
+	char c;
+
+	while ((c = *ptr++) != '\0') {
+	}
+}
+
 void
 decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
 		unsigned long free_mem_ptr_end_p,
@@ -184,11 +192,11 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
 
 	arch_decomp_setup();
 
-	putstr("Uncompressing Linux...");
+	putstrdummy("Uncompressing Linux...");
 	ret = do_decompress(input_data, input_data_end - input_data,
 			    output_data, error);
 	if (ret)
 		error("decompressor returned an error");
 	else
-		putstr(" done, booting the kernel.\n");
+		putstrdummy(" done, booting the kernel.\n");
 }

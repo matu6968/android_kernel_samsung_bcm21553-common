@@ -16,8 +16,9 @@
  * __get_user_X
  *
  * Inputs:	r0 contains the address
+ *		r1 contains the address limit, which must be preserved
  * Outputs:	r0 is the error code
- *		r2, r3 contains the zero-extended value
+ *		r2 contains the zero-extended value
  *		lr corrupted
  *
  * No other registers must be altered.  (see <asm/uaccess.h>
@@ -27,33 +28,37 @@
  * Note also that it is intended that __get_user_bad is not global.
  */
 #include <linux/linkage.h>
+#include <asm/assembler.h>
 #include <asm/errno.h>
 #include <asm/domain.h>
 
 ENTRY(__get_user_1)
+	check_uaccess r0, 1, r1, r2, __get_user_bad
 1:	T(ldrb)	r2, [r0]
 	mov	r0, #0
 	mov	pc, lr
 ENDPROC(__get_user_1)
 
 ENTRY(__get_user_2)
+	check_uaccess r0, 2, r1, r2, __get_user_bad
 #ifdef CONFIG_THUMB2_KERNEL
 2:	T(ldrb)	r2, [r0]
-3:	T(ldrb)	r3, [r0, #1]
+3:	T(ldrb)	ip, [r0, #1]
 #else
 2:	T(ldrb)	r2, [r0], #1
-3:	T(ldrb)	r3, [r0]
+3:	T(ldrb)	ip, [r0]
 #endif
 #ifndef __ARMEB__
-	orr	r2, r2, r3, lsl #8
+	orr	r2, r2, ip, lsl #8
 #else
-	orr	r2, r3, r2, lsl #8
+	orr	r2, ip, r2, lsl #8
 #endif
 	mov	r0, #0
 	mov	pc, lr
 ENDPROC(__get_user_2)
 
 ENTRY(__get_user_4)
+	check_uaccess r0, 4, r1, r2, __get_user_bad
 4:	T(ldr)	r2, [r0]
 	mov	r0, #0
 	mov	pc, lr
