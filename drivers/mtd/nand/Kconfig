@@ -1,3 +1,10 @@
+config MTD_NAND_IDS
+	tristate "Include chip ids for known NAND devices."
+	depends on MTD
+	help
+	  Useful for NAND drivers that do not use the NAND subsystem but
+	  still like to take advantage of the known chip information.
+
 config MTD_NAND_ECC
 	tristate
 
@@ -232,6 +239,42 @@ config MTD_NAND_S3C2410_CLKSTOP
 	  selected to save power. This will mean there is a small delay
 	  when the is NAND chip selected or released, but will save
 	  approximately 5mA of power when there is nothing happening.
+
+config MTD_NAND_BRCM_UMI
+	tristate "NAND Flash support for BCM116X Boards"
+	depends on (ARCH_BCM116X || ARCH_BCM215XX)
+	help
+	  This enables the NAND flash controller on the BCM UMI block.
+
+	  No board specfic support is done by this driver, each board
+	  must advertise a platform_device for the driver to attach.
+
+config MTD_NAND_BRCM_NVSRAM
+	tristate "NVSRAM Controller (ARM PrimeCell PL353) NAND Flash driver for BCM21553 Boards"
+	depends on ARCH_BCM215XX
+	help
+	  This enables the NVSRAM Controller (ARM PrimeCell PL353) for NAND flash.
+
+	  No board specfic support is done by this driver, each board
+	  must advertise a platform_device for the driver to attach.
+
+config MTD_USE_HW_NAND_CONTROLLER_ECC
+	bool "Use the NVSRAM NAND controller 1-bit ECC"
+	depends on MTD_NAND_BRCM_NVSRAM
+	default y
+	help
+	  This selects the H/W NVSRAM NAND controller based 1-bit ECC.
+
+	  Select this for NAND flash chips that don't support on-die ECC.
+
+config MTD_USE_NAND_FLASH_ON_DIE_ECC
+	bool "Use the On-die 4-bit ECC provided by Micron NAND chips"
+	depends on MTD_NAND_BRCM_NVSRAM
+	default n
+	help
+	  This selects the Micron NAND on-die 4-bit ECC.
+
+	  Select this for Micron NAND flash chips.
 
 config MTD_NAND_BCM_UMI
 	tristate "NAND Flash support for BCM Reference Boards"
@@ -529,5 +572,11 @@ config MTD_NAND_FSMC
 	help
 	  Enables support for NAND Flash chips on the ST Microelectronics
 	  Flexible Static Memory Controller (FSMC)
+config BRCM_TOSHIBA_NAND_OTP
+	bool "OTP support for Toshiba NAND"
+	depends on MTD_NAND
+	help
+	  Enables read/write support to Toshiba OTP through standard MTD
+          interface.
 
 endif # MTD_NAND

@@ -284,6 +284,14 @@ struct _mmc_csd {
 #define EXT_CSD_SEC_FEATURE_SUPPORT	231	/* RO */
 #define EXT_CSD_TRIM_MULT		232	/* RO */
 
+#define EXT_CSD_BUS_WIDTH	183	/* R/W */
+#define EXT_CSD_HS_TIMING	185	/* R/W */
+#define EXT_CSD_CARD_TYPE	196	/* RO */
+#define EXT_CSD_STRUCTURE	194	/* RO */
+#define EXT_CSD_REV		192	/* RO */
+#define EXT_CSD_SEC_CNT		212	/* RO, 4 bytes */
+#define EXT_CSD_S_A_TIMEOUT	217
+#define EXT_CSD_BOOT_SIZE_MULTI	226
 /*
  * EXT_CSD field definitions
  */
