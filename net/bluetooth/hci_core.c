@@ -1628,8 +1628,7 @@ void hci_send_acl(struct hci_conn *conn, struct sk_buff *skb, __u16 flags)
 		spin_lock_bh(&conn->data_q.lock);
 
 		__skb_queue_tail(&conn->data_q, skb);
-
-		flags &= ~ACL_START;
+		flags &= ~ACL_PB_MASK;
 		flags |= ACL_CONT;
 		do {
 			skb = list; list = list->next;

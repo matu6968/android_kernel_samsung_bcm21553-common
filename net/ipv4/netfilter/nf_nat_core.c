@@ -433,7 +433,7 @@ int nf_nat_icmp_reply_translation(struct nf_conn *ct,
 
 	/* Must be RELATED */
 	NF_CT_ASSERT(skb->nfctinfo == IP_CT_RELATED ||
-		     skb->nfctinfo == IP_CT_RELATED+IP_CT_IS_REPLY);
+		     skb->nfctinfo == IP_CT_RELATED_REPLY);
 
 	/* Redirects on non-null nats must be dropped, else they'll
 	   start talking to each other without our translation, and be
@@ -777,3 +777,4 @@ MODULE_ALIAS("nf-nat-ipv4");
 
 module_init(nf_nat_init);
 module_exit(nf_nat_cleanup);
+
