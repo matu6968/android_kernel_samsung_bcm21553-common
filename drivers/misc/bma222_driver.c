@@ -17,6 +17,7 @@
     Details.
 */
 
+#include <linux/mutex.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -601,9 +602,17 @@ static int bma222_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	}
 }
 
+/* Replace the removed legacy ioctl BKL serialization. */
+static DEFINE_MUTEX(bma222_ioctl_lock);
+
 static long bma222_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	return bma222_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	long result;
+	if (mutex_lock_interruptible(&bma222_ioctl_lock))
+		return -ERESTARTSYS;
+	result = bma222_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	mutex_unlock(&bma222_ioctl_lock);
+	return result;
 }
 
 static const struct file_operations bma222_fops = {

@@ -21,6 +21,7 @@
 *
 ****************************************************************************/
 
+#include <linux/mutex.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -781,9 +782,17 @@ static ssize_t max8986_write(struct file *file, const char __user *buffer,
 	return len;
 }
 
+/* Replace the removed legacy ioctl BKL serialization. */
+static DEFINE_MUTEX(pmu_ioctl_lock);
+
 static long max8986_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	return max8986_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	long result;
+	if (mutex_lock_interruptible(&pmu_ioctl_lock))
+		return -ERESTARTSYS;
+	result = max8986_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	mutex_unlock(&pmu_ioctl_lock);
+	return result;
 }
 
 static const struct file_operations max8986_pmu_ops = {

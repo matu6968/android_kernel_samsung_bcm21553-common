@@ -4,6 +4,7 @@
  * COPYRIGHT(C) : Samsung Electronics Co.Ltd, 2006-2015 ALL RIGHTS RESERVED
  *
  *****************************************************************************/
+#include <linux/mutex.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/irq.h>
@@ -40,9 +41,17 @@
 static struct regulator *prox_regulator=NULL;
 static bool prox_power_mode = false;
 static short prox_value_cnt = 0;
+/* Replace the removed legacy ioctl BKL serialization. */
+static DEFINE_MUTEX(prox_ioctl_lock);
+
 static long gp2a_prox_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	return gp2a_prox_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	long result;
+	if (mutex_lock_interruptible(&prox_ioctl_lock))
+		return -ERESTARTSYS;
+	result = gp2a_prox_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	mutex_unlock(&prox_ioctl_lock);
+	return result;
 }
 
 static struct file_operations gp2a_prox_fops = {
