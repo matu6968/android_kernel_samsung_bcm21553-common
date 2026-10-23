@@ -3769,11 +3769,19 @@ static int onenand_chip_probe(struct mtd_info *mtd)
 {
 	struct onenand_chip *this = mtd->priv;
 	int bram_maf_id, bram_dev_id, maf_id, dev_id;
+#ifndef CONFIG_ARCH_BCM215XX
 	int syscfg;
+#endif
 
+#ifdef CONFIG_ARCH_BCM215XX
+	/* Broadcom leaves the interface in synchronous mode: do not issue
+	 * BootRAM commands. Read both IDs from the register interface instead.
+	 */
+	bram_maf_id = this->read_word(this->base + ONENAND_REG_MANUFACTURER_ID);
+	bram_dev_id = this->read_word(this->base + ONENAND_REG_DEVICE_ID);
+#else
 	/* Save system configuration 1 */
 	syscfg = this->read_word(this->base + ONENAND_REG_SYS_CFG1);
-#if 0
 	/* Clear Sync. Burst Read mode to read BootRAM */
 	this->write_word((syscfg & ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE), this->base + ONENAND_REG_SYS_CFG1);
 
@@ -3858,7 +3866,7 @@ static int onenand_probe(struct mtd_info *mtd)
 	/* The data buffer size is equal to page size */
 	mtd->writesize = this->read_word(this->base + ONENAND_REG_DATA_BUFFER_SIZE);
 	/* We use the full BufferRAM */
-	if (ONENAND_IS_4KB_PAGE(this))
+	if (ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this))
 		mtd->writesize <<= 1;
 
 	mtd->oobsize = mtd->writesize >> 5;
