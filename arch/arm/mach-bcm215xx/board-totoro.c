@@ -3113,6 +3113,7 @@ MACHINE_START(BCM1160, "GT-S5360 Board")
 	/* Maintainer: Broadcom Corporation */
 	.boot_params = (PHYS_OFFSET + 0x100),
 	.map_io = bcm21553_map_io,
+	.reserve = bcm21553_reserve,
 	.init_irq = bcm21553_init_irq,
 	.timer = &bcm21553_timer,
 	.init_machine = bcm21553_init_machine,
