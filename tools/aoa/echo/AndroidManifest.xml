@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.galaxyy.aoa" android:versionCode="1" android:versionName="1.0">
+    <uses-sdk android:minSdkVersion="15" android:targetSdkVersion="15" />
+    <uses-feature android:name="android.hardware.usb.accessory" android:required="true" />
+    <application android:label="Galaxy Y AOA Echo" android:debuggable="true">
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask">
+            <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
+            <intent-filter><action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" /></intent-filter>
+            <meta-data android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" android:resource="@xml/accessory_filter" />
+        </activity>
+    </application>
+</manifest>
