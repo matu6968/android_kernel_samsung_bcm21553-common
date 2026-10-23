@@ -306,6 +306,21 @@ config LEDS_REGULATOR
 	help
 	  This option enables support for regulator driven LEDs.
 
+config LEDS_BCM21553
+       tristate "LED support for Broadcom BCM21553 PMU(by regulator driven)"
+       depends on LEDS_CLASS
+       help
+         This option enables support for control of LEDs connected to
+         BCM21553 PMU.
+
+config LEDS_BCM59035
+       tristate "LED support for Broadcom BCM59035 PMU"
+       depends on LEDS_CLASS && HAVE_PWM
+       help
+         This option enables support for control of LEDs connected to
+         BCM59035 PMU. The LED pattern and pattern-repetition period
+         is set through sysfs.
+
 config LEDS_BD2802
 	tristate "LED driver for BD2802 RGB LED"
 	depends on LEDS_CLASS
@@ -445,6 +460,12 @@ config LEDS_TRIGGER_DEFAULT_ON
 	help
 	  This allows LEDs to be initialised in the ON state.
 	  If unsure, say Y.
+
+config LEDS_TRIGGER_SLEEP
+	tristate "LED Sleep Mode Trigger"
+	depends on LEDS_TRIGGERS && HAS_EARLYSUSPEND
+	help
+	  This turns LEDs on when the screen is off but the cpu still running.
 
 comment "iptables trigger is under Netfilter config (LED target)"
 	depends on LEDS_TRIGGERS

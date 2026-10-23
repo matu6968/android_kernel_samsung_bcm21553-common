@@ -1611,5 +1611,10 @@ config SERIAL_MXS_AUART_CONSOLE
 	select SERIAL_CORE_CONSOLE
 	help
 	  Enable a MXS AUART port to be the system console.
+config KEYPAD_BACKLIGHT
+	tristate "Keypad Backlight Driver"
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y to enable keypad backlight driver.
 
 endmenu

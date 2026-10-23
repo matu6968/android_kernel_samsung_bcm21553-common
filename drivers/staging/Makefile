@@ -30,6 +30,8 @@ obj-$(CONFIG_R8712U)		+= rtl8712/
 obj-$(CONFIG_RTS_PSTOR)		+= rts_pstor/
 obj-$(CONFIG_SPECTRA)		+= spectra/
 obj-$(CONFIG_TRANZPORT)		+= frontier/
+obj-$(CONFIG_ANDROID)		+= android/
+
 obj-$(CONFIG_POHMELFS)		+= pohmelfs/
 obj-$(CONFIG_IDE_PHISON)	+= phison/
 obj-$(CONFIG_LINE6_USB)		+= line6/
@@ -43,9 +45,12 @@ obj-$(CONFIG_VME_BUS)		+= vme/
 obj-$(CONFIG_DX_SEP)            += sep/
 obj-$(CONFIG_IIO)		+= iio/
 obj-$(CONFIG_CS5535_GPIO)	+= cs5535_gpio/
-obj-$(CONFIG_ZRAM)		+= zram/
+
 obj-$(CONFIG_XVMALLOC)		+= zram/
 obj-$(CONFIG_ZCACHE)		+= zcache/
+
+obj-$(CONFIG_ZRAM)		+= zram/
+obj-$(CONFIG_ZSMALLOC)		+= zsmalloc/
 obj-$(CONFIG_WLAGS49_H2)	+= wlags49_h2/
 obj-$(CONFIG_WLAGS49_H25)	+= wlags49_h25/
 obj-$(CONFIG_FB_SM7XX)		+= sm7xx/
@@ -70,3 +75,5 @@ obj-$(CONFIG_ALTERA_STAPL)	+=altera-stapl/
 obj-$(CONFIG_TOUCHSCREEN_CLEARPAD_TM1217)	+= cptm1217/
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)	+= ste_rmi4/
 obj-$(CONFIG_DRM_PSB)		+= gma500/
+obj-$(CONFIG_BRCM_MODULES)	+= bcm21553/
+
