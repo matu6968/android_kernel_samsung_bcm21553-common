@@ -18,6 +18,8 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/list.h>
 #include <linux/debugfs.h>
 #include <linux/android_pmem.h>
@@ -1223,6 +1225,39 @@ static struct miscdevice pmem_dev = {
 };
 #endif
 
+/*
+ * Since 2.6.39 ioremap() refuses RAM (ARMv6 aliasing), but pmem regions are
+ * carved out of system RAM. Cached regions use the existing linear mapping;
+ * the others get a vmap() with the requested attributes. Anything that is not
+ * RAM (e.g. a dedicated SRAM) still goes through ioremap().
+ */
+static void __iomem *pmem_map_region(unsigned long base, unsigned long size,
+				unsigned cached, unsigned buffered)
+{
+	struct page **pages;
+	unsigned long i, n;
+	void *va;
+
+	if (!pfn_valid(__phys_to_pfn(base))) {
+		if (cached)
+			return ioremap_cached(base, size);
+		return ioremap(base, size);
+	}
+	if (cached)
+		return (void __iomem *)__va(base);
+
+	n = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	pages = kmalloc(n * sizeof(*pages), GFP_KERNEL);
+	if (!pages)
+		return NULL;
+	for (i = 0; i < n; i++)
+		pages[i] = pfn_to_page(__phys_to_pfn(base) + i);
+	va = vmap(pages, n, VM_MAP, buffered ?
+		  pgprot_writecombine(PAGE_KERNEL) : pgprot_noncached(PAGE_KERNEL));
+	kfree(pages);
+	return (void __iomem *)va;
+}
+
 int pmem_setup(struct android_pmem_platform_data *pdata,
 	       long (*ioctl)(struct file *, unsigned int, unsigned long),
 	       int (*release)(struct inode *, struct file *))
@@ -1269,16 +1304,8 @@ int pmem_setup(struct android_pmem_platform_data *pdata,
 		}
 	}
 
-	if (pmem[id].cached)
-		pmem[id].vbase = ioremap_cached(pmem[id].base,
-						pmem[id].size);
-#ifdef ioremap_ext_buffered
-	else if (pmem[id].buffered)
-		pmem[id].vbase = ioremap_ext_buffered(pmem[id].base,
-						      pmem[id].size);
-#endif
-	else
-		pmem[id].vbase = ioremap(pmem[id].base, pmem[id].size);
+	pmem[id].vbase = pmem_map_region(pmem[id].base, pmem[id].size,
+				    pmem[id].cached, pmem[id].buffered);
 
 	if (pmem[id].vbase == 0)
 		goto error_cant_remap;
