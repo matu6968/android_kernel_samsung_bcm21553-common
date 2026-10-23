@@ -21,6 +21,7 @@
 #include <linux/ctype.h>
 #include <linux/genhd.h>
 #include <linux/blktrace_api.h>
+#include <linux/vmalloc.h>
 
 #include "check.h"
 
@@ -155,13 +156,15 @@ const char *__bdevname(dev_t dev, char *buffer)
 
 EXPORT_SYMBOL(__bdevname);
 
+struct parsed_partitions *g_state = NULL;
+
 static struct parsed_partitions *
 check_partition(struct gendisk *hd, struct block_device *bdev)
 {
 	struct parsed_partitions *state;
 	int i, res, err;
 
-	state = kzalloc(sizeof(struct parsed_partitions), GFP_KERNEL);
+	state = kzalloc(sizeof(struct parsed_partitions), GFP_KERNEL | __GFP_REPEAT);
 	if (!state)
 		return NULL;
 	state->pp_buf = (char *)__get_free_page(GFP_KERNEL);
@@ -294,6 +297,13 @@ ssize_t part_inflight_show(struct device *dev,
 		atomic_read(&p->in_flight[1]));
 }
 
+ssize_t part_partition_name_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct hd_struct *p = dev_to_part(dev);
+	return sprintf(buf, "%s\n", p->partition_name);
+}
+
 #ifdef CONFIG_FAIL_MAKE_REQUEST
 ssize_t part_fail_show(struct device *dev,
 		       struct device_attribute *attr, char *buf)
@@ -326,6 +336,8 @@ static DEVICE_ATTR(discard_alignment, S_IRUGO, part_discard_alignment_show,
 		   NULL);
 static DEVICE_ATTR(stat, S_IRUGO, part_stat_show, NULL);
 static DEVICE_ATTR(inflight, S_IRUGO, part_inflight_show, NULL);
+static DEVICE_ATTR(partition_name, S_IRUGO, part_partition_name_show, NULL);
+
 #ifdef CONFIG_FAIL_MAKE_REQUEST
 static struct device_attribute dev_attr_fail =
 	__ATTR(make-it-fail, S_IRUGO|S_IWUSR, part_fail_show, part_fail_store);
@@ -340,6 +352,7 @@ static struct attribute *part_attrs[] = {
 	&dev_attr_discard_alignment.attr,
 	&dev_attr_stat.attr,
 	&dev_attr_inflight.attr,
+	&dev_attr_partition_name.attr,
 #ifdef CONFIG_FAIL_MAKE_REQUEST
 	&dev_attr_fail.attr,
 #endif
@@ -366,10 +379,19 @@ static void part_release(struct device *dev)
 	kfree(p);
 }
 
+static int part_uevent(struct device *dev, struct kobj_uevent_env *env)
+{
+	struct hd_struct *part = dev_to_part(dev);
+
+	add_uevent_var(env, "PARTN=%u", part->partno);
+	return 0;
+}
+
 struct device_type part_type = {
 	.name		= "partition",
 	.groups		= part_attr_groups,
 	.release	= part_release,
+	.uevent		= part_uevent,
 };
 
 static void delete_partition_rcu_cb(struct rcu_head *head)
@@ -415,6 +437,11 @@ static ssize_t whole_disk_show(struct device *dev,
 }
 static DEVICE_ATTR(whole_disk, S_IRUSR | S_IRGRP | S_IROTH,
 		   whole_disk_show, NULL);
+
+static void name_partition(struct hd_struct *p, const char *name)
+{
+	strlcpy(p->partition_name, name, GENHD_PART_NAME_SIZE);
+}
 
 struct hd_struct *add_partition(struct gendisk *disk, int partno,
 				sector_t start, sector_t len, int flags,
@@ -549,6 +576,8 @@ rescan:
 	if (state && !IS_ERR(state)) {
 		kfree(state);
 		state = NULL;
+		if (!strcmp(bdev->bd_disk->disk_name,"mmcblk0"))
+			g_state = NULL;
 	}
 
 	if (bdev->bd_part_count)
@@ -656,12 +685,15 @@ rescan:
 			       disk->disk_name, p, -PTR_ERR(part));
 			continue;
 		}
+		name_partition(part, state->parts[p].name);
 #ifdef CONFIG_BLK_DEV_MD
 		if (state->parts[p].flags & ADDPART_FLAG_RAID)
 			md_autodetect_dev(part_to_dev(part)->devt);
 #endif
 	}
-	kfree(state);
+	
+	if (strcmp(bdev->bd_disk->disk_name,"mmcblk0"))
+		kfree(state);
 	return 0;
 }
 
