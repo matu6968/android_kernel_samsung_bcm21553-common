@@ -20,6 +20,7 @@
  *
  */
 
+#include <linux/mutex.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
@@ -64,9 +65,17 @@ static short ecompass_delay = 0;
 
 static struct input_dev *ecs_data_device;
 
+/* Replace the removed legacy ioctl BKL serialization. */
+static DEFINE_MUTEX(ecs_ioctl_lock);
+
 static long ecs_ctrl_ioctl_unlocked(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	return ecs_ctrl_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	long result;
+	if (mutex_lock_interruptible(&ecs_ioctl_lock))
+		return -ERESTARTSYS;
+	result = ecs_ctrl_ioctl(file->f_path.dentry->d_inode, file, cmd, arg);
+	mutex_unlock(&ecs_ioctl_lock);
+	return result;
 }
 
 static struct file_operations ecs_ctrl_fops = {

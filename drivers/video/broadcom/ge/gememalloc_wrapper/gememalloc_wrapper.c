@@ -15,6 +15,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 /* needed for __init,__exit directives */
 #include <linux/init.h>
 /* needed for remap_page_range */
@@ -114,7 +115,21 @@ static void dma_cleanup()
 }
 
 
-static long gememalloc_wrapper_ioctl(struct file *filp,
+/* DMA copy state is global and completion is delivered by the IRQ handler. */
+static DEFINE_MUTEX(gememalloc_ioctl_lock);
+static long gememalloc_do_ioctl(struct file *, unsigned int, unsigned long);
+static long gememalloc_wrapper_ioctl(struct file *file, unsigned int cmd,
+                                    unsigned long arg)
+{
+    long result;
+    if (mutex_lock_interruptible(&gememalloc_ioctl_lock))
+        return -ERESTARTSYS;
+    result = gememalloc_do_ioctl(file, cmd, arg);
+    mutex_unlock(&gememalloc_ioctl_lock);
+    return result;
+}
+
+static long gememalloc_do_ioctl(struct file *filp,
 				  unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = filp->f_path.dentry->d_inode;
