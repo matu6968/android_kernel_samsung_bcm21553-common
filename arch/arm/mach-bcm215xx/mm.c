@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/bootmem.h>
+#include <linux/memblock.h>
 #include <mach/setup.h>
 #include <asm/setup.h>
 #include <linux/dma-mapping.h>
@@ -105,8 +106,28 @@ uint32_t ge_mem_phys_base = CONFIG_MM_MEMPOOL_BASE_ADDR;
 void *memalloc_mempool_base;
 #endif
 void *cam_mempool_base;
+/*
+ * The multimedia pools are carved out of RAM before paging_init(), from the
+ * machine ->reserve hook. Since 2.6.39 paging_init() runs the machine map_io
+ * before bootmem_init(), so the bootmem allocator is not usable from map_io
+ * any more (mark_bootmem() hits BUG() with no bootmem node registered).
+ */
+static int __init bcm21553_reserve_block(phys_addr_t base, phys_addr_t size)
+{
+	/* exclusive: fail if the block overlaps anything already reserved */
+	if (memblock_is_region_reserved(base, size))
+		return -EBUSY;
+	return memblock_reserve(base, size);
+}
+
+/* Page-aligned boot-time allocation, memblock version of the old low-pages helper. */
+static void *__init bcm21553_alloc_pool(phys_addr_t size)
+{
+	return __va(memblock_alloc(size, PAGE_SIZE));
+}
+
 /* MM here stands for multi-media */
-void bcm21553_mm_mem_init(void)
+static void __init bcm21553_mm_mem_init(void)
 {
 	int ret, size;
 	uint32_t v3d_mem_phys_base = CONFIG_MM_MEMPOOL_BASE_ADDR;
@@ -144,7 +165,7 @@ void bcm21553_mm_mem_init(void)
 
 #ifdef CONFIG_BRCM_V3D
 	if (v3d_mempool_size) {
-	ret = reserve_bootmem(v3d_mem_phys_base, v3d_mempool_size, BOOTMEM_EXCLUSIVE);
+	ret = bcm21553_reserve_block(v3d_mem_phys_base, v3d_mempool_size);
 	if (ret < 0) {
 		printk(KERN_ERR "Failed to allocate memory for v3d\n");
 		return;
@@ -160,7 +181,7 @@ void bcm21553_mm_mem_init(void)
 #endif
 
 #if defined (CONFIG_BMEM)
-	ret = reserve_bootmem(bmem_phys_base, BMEM_SIZE, BOOTMEM_EXCLUSIVE);
+	ret = bcm21553_reserve_block(bmem_phys_base, BMEM_SIZE);
 	if (ret < 0) {
 		printk(KERN_ERR "Failed to allocate memory for ge\n");
 		return;
@@ -171,7 +192,7 @@ void bcm21553_mm_mem_init(void)
 		bmem_phys_base, (uint32_t)bmem_mempool_base, BMEM_SIZE);
 #else
 #ifdef CONFIG_GE_WRAP
-	ret = reserve_bootmem(ge_mem_phys_base, gememalloc_SIZE, BOOTMEM_EXCLUSIVE);
+	ret = bcm21553_reserve_block(ge_mem_phys_base, gememalloc_SIZE);
 	if (ret < 0) {
 		printk(KERN_ERR "Failed to allocate memory for ge\n");
 		return;
@@ -185,20 +206,20 @@ void bcm21553_mm_mem_init(void)
 
 #if defined (CONFIG_BMEM)
 #ifdef CONFIG_HANTRO_WRAP
-	memalloc_mempool_base = alloc_bootmem_low_pages(2 * PAGE_SIZE);
+	memalloc_mempool_base = bcm21553_alloc_pool(2 * PAGE_SIZE);
 	pr_info("memalloc(hantro) phys[0x%08x] virt[0x%08x] size[0x%08x] \n",
 		(uint32_t)virt_to_phys(memalloc_mempool_base), (uint32_t)memalloc_mempool_base,
 		(uint32_t)(2 * PAGE_SIZE));
 #endif
-	cam_mempool_base = alloc_bootmem_low_pages(2 * PAGE_SIZE);
+	cam_mempool_base = bcm21553_alloc_pool(2 * PAGE_SIZE);
 	pr_info("pmem(camera) phys[0x%08x] virt[0x%08x] size[0x%08x] \n",
 		(uint32_t)virt_to_phys(cam_mempool_base), (uint32_t)cam_mempool_base,
 		(uint32_t)(2 * PAGE_SIZE));
 #else
 #ifdef CONFIG_HANTRO_WRAP
-	memalloc_mempool_base = alloc_bootmem_low_pages(MEMALLOC_SIZE + SZ_2M);
+	memalloc_mempool_base = bcm21553_alloc_pool(MEMALLOC_SIZE + SZ_2M);
 #endif
-	cam_mempool_base = alloc_bootmem_low_pages(1024 * 1024 * 8);
+	cam_mempool_base = bcm21553_alloc_pool(1024 * 1024 * 8);
 #endif
 }
 
@@ -235,9 +256,14 @@ int bcm21553_l2_evt_buf_init(void)
 void __init bcm21553_map_io(void)
 {
 	iotable_init(bcm21553_io_desc, ARRAY_SIZE(bcm21553_io_desc));
-	bcm21553_mm_mem_init();
 
 	/* as soon as INFORM3 is visible, sec_debug is ready to run */
 	sec_debug_init();
 	
+}
+
+/* Machine ->reserve hook: runs from arm_memblock_init(), before paging_init(). */
+void __init bcm21553_reserve(void)
+{
+	bcm21553_mm_mem_init();
 }
