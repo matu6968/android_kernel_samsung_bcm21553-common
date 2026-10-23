@@ -155,7 +155,18 @@ static struct mtd_partition * newpart(char *s,
         /* test for options */
         if (strncmp(s, "ro", 2) == 0)
 	{
-		mask_flags |= MTD_WRITEABLE;
+		/* SAMSUNG HACK: override the ro flag for the boot partition */
+		if (strncmp(name, "boot)", 5) != 0) {
+			mask_flags |= MTD_WRITEABLE;
+		} else {
+			dbg(("overriding (ro) flag for <boot> partition\n"));
+		}
+		s += 2;
+        }
+
+        /* SAMSUNG HACK: parse the rw flag (do nothing) */
+        if (strncmp(s, "rw", 2) == 0)
+	{
 		s += 2;
         }
 

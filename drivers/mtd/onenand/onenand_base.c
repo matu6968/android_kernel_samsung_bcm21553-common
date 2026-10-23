@@ -1387,7 +1387,7 @@ static int onenand_read_oob_nolock(struct mtd_info *mtd, loff_t from,
 
 	stats = mtd->ecc_stats;
 
-	readcmd = ONENAND_IS_4KB_PAGE(this) ? ONENAND_CMD_READ : ONENAND_CMD_READOOB;
+	readcmd = (ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this)) ? ONENAND_CMD_READ : ONENAND_CMD_READOOB;
 
 	while (read < len) {
 		cond_resched();
@@ -1594,7 +1594,7 @@ int onenand_bbt_read_oob(struct mtd_info *mtd, loff_t from,
 
 	column = from & (mtd->oobsize - 1);
 
-	readcmd = ONENAND_IS_4KB_PAGE(this) ? ONENAND_CMD_READ : ONENAND_CMD_READOOB;
+	readcmd = (ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this))? ONENAND_CMD_READ : ONENAND_CMD_READOOB;
 
 	while (read < len) {
 		cond_resched();
@@ -1648,7 +1648,7 @@ static int onenand_verify_oob(struct mtd_info *mtd, const u_char *buf, loff_t to
 	u_char *oob_buf = this->oob_buf;
 	int status, i, readcmd;
 
-	readcmd = ONENAND_IS_4KB_PAGE(this) ? ONENAND_CMD_READ : ONENAND_CMD_READOOB;
+	readcmd = (ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this))? ONENAND_CMD_READ : ONENAND_CMD_READOOB;
 
 	this->command(mtd, readcmd, to, mtd->oobsize);
 	onenand_update_bufferram(mtd, to, 0);
@@ -2115,7 +2115,7 @@ static int onenand_write_oob_nolock(struct mtd_info *mtd, loff_t to,
 
 	oobbuf = this->oob_buf;
 
-	oobcmd = ONENAND_IS_4KB_PAGE(this) ? ONENAND_CMD_PROG : ONENAND_CMD_PROGOOB;
+	oobcmd = ONENAND_IS_MLC(this) || ONENAND_IS_4KB_PAGE(this) ? ONENAND_CMD_PROG : ONENAND_CMD_PROGOOB;
 
 	/* Loop until all data write */
 	while (written < len) {
@@ -3072,9 +3072,9 @@ static int do_otp_read(struct mtd_info *mtd, loff_t from, size_t len,
 		.ooblen	= 0,
 		.datbuf	= buf,
 		.oobbuf	= NULL,
+		.retlen = 0,
 	};
 	int ret;
-
 	/* Enter OTP access mode */
 	this->command(mtd, ONENAND_CMD_OTP_ACCESS, 0, 0);
 	this->wait(mtd, FL_OTPING);
@@ -3082,11 +3082,11 @@ static int do_otp_read(struct mtd_info *mtd, loff_t from, size_t len,
 	ret = ONENAND_IS_4KB_PAGE(this) ?
 		onenand_mlc_read_ops_nolock(mtd, from, &ops) :
 		onenand_read_ops_nolock(mtd, from, &ops);
+	*retlen = ops.retlen;
 
 	/* Exit OTP access mode */
 	this->command(mtd, ONENAND_CMD_RESET, 0, 0);
 	this->wait(mtd, FL_RESETING);
-
 	return ret;
 }
 
@@ -3107,7 +3107,6 @@ static int do_otp_write(struct mtd_info *mtd, loff_t to, size_t len,
 	unsigned char *pbuf = buf;
 	int ret;
 	struct mtd_oob_ops ops;
-
 	/* Force buffer page aligned */
 	if (len < mtd->writesize) {
 		memcpy(this->page_buf, buf, len);
@@ -3130,7 +3129,6 @@ static int do_otp_write(struct mtd_info *mtd, loff_t to, size_t len,
 	/* Exit OTP access mode */
 	this->command(mtd, ONENAND_CMD_RESET, 0, 0);
 	this->wait(mtd, FL_RESETING);
-
 	return ret;
 }
 
@@ -3229,7 +3227,6 @@ static int onenand_otp_walk(struct mtd_info *mtd, loff_t from, size_t len,
 	while (len > 0 && otp_pages > 0) {
 		if (!action) {	/* OTP Info functions */
 			struct otp_info *otpinfo;
-
 			len -= sizeof(struct otp_info);
 			if (len <= 0) {
 				ret = -ENOSPC;
@@ -3819,6 +3816,7 @@ static int onenand_chip_probe(struct mtd_info *mtd)
 
 	/* Save system configuration 1 */
 	syscfg = this->read_word(this->base + ONENAND_REG_SYS_CFG1);
+#if 0
 	/* Clear Sync. Burst Read mode to read BootRAM */
 	this->write_word((syscfg & ~ONENAND_SYS_CFG1_SYNC_READ & ~ONENAND_SYS_CFG1_SYNC_WRITE), this->base + ONENAND_REG_SYS_CFG1);
 
@@ -3836,6 +3834,7 @@ static int onenand_chip_probe(struct mtd_info *mtd)
 
 	/* Restore system configuration 1 */
 	this->write_word(syscfg, this->base + ONENAND_REG_SYS_CFG1);
+#endif
 
 	/* Check manufacturer ID */
 	if (onenand_check_maf(bram_maf_id))
