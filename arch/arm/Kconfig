@@ -12,6 +12,7 @@ config ARM
 	select HAVE_ARCH_KGDB
 	select HAVE_KPROBES if (!XIP_KERNEL && !THUMB2_KERNEL)
 	select HAVE_KRETPROBES if (HAVE_KPROBES)
+	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
 	select HAVE_FUNCTION_TRACER if (!XIP_KERNEL)
 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
@@ -183,6 +184,8 @@ config FIQ
 config ARCH_MTD_XIP
 	bool
 
+config ARM_L1_CACHE_SHIFT_6
+	bool
 config VECTORS_BASE
 	hex
 	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
@@ -302,6 +305,15 @@ config ARCH_BCMRING
 	select ARCH_WANT_OPTIONAL_GPIOLIB
 	help
 	  Support for Broadcom's BCMRing platform.
+
+config PLAT_BCMAP
+    bool "BROADCOM family of ARM based processors"
+    select GENERIC_TIME
+    select GENERIC_CLOCKEVENTS
+    select GENERIC_GPIO
+    select ARCH_REQUIRE_GPIOLIB
+    help
+      Support for Broadcom family of ARM based application processors
 
 config ARCH_CLPS711X
 	bool "Cirrus Logic CLPS711x/EP721x-based"
@@ -898,7 +910,13 @@ endchoice
 #
 source "arch/arm/mach-at91/Kconfig"
 
+source "arch/arm/plat-bcmap/Kconfig"
+
 source "arch/arm/mach-bcmring/Kconfig"
+
+source "arch/arm/mach-bcm116x/Kconfig"
+
+source "arch/arm/mach-bcm215xx/Kconfig"
 
 source "arch/arm/mach-clps711x/Kconfig"
 
@@ -1423,6 +1441,7 @@ source kernel/Kconfig.preempt
 
 config HZ
 	int
+	default 128 if ARCH_L7200 || ARCH_BCM116X || ARCH_BCM215XX
 	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P64X0 || \
 		ARCH_S5P6442 || ARCH_S5PV210 || ARCH_EXYNOS4
 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
@@ -1543,7 +1562,7 @@ config HIGHPTE
 
 config HW_PERF_EVENTS
 	bool "Enable hardware performance counter support for perf events"
-	depends on PERF_EVENTS && CPU_HAS_PMU
+	depends on PERF_EVENTS && CPU_HAS_PMU && (CPU_V6 || CPU_V6K || CPU_V7)
 	default y
 	help
 	  Enable hardware performance counter support for perf events. If
@@ -1742,16 +1761,31 @@ config CMDLINE
 	  time by entering them here. As a minimum, you should specify the
 	  memory size and the root device (e.g., mem=64M root=/dev/nfs).
 
+choice
+	prompt "Kernel command line type" if CMDLINE != ""
+	default CMDLINE_FROM_BOOTLOADER
+
+config CMDLINE_FROM_BOOTLOADER
+	bool "Use bootloader kernel arguments if available"
+	help
+	  Uses the command-line options passed by the boot loader. If
+	  the boot loader doesn't provide any, the default kernel command
+	  string provided in CMDLINE will be used.
+
+config CMDLINE_EXTEND
+	bool "Extend bootloader kernel arguments"
+	help
+	  The command-line arguments provided by the boot loader will be
+	  appended to the default kernel command string.
+
 config CMDLINE_FORCE
 	bool "Always use the default kernel command string"
-	depends on CMDLINE != ""
 	help
 	  Always use the default kernel command string, even if the boot
 	  loader passes other arguments to the kernel.
 	  This is useful if you cannot or don't want to change the
 	  command-line options your boot loader passes to the kernel.
-
-	  If unsure, say N.
+endchoice
 
 config XIP_KERNEL
 	bool "Kernel Execute-In-Place from ROM"
