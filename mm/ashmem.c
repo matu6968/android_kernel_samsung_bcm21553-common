@@ -347,9 +347,11 @@ out:
  * chunks of ashmem regions LRU-wise one-at-a-time until we hit 'nr_to_scan'
  * pages freed.
  */
-static int ashmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
+static int ashmem_shrink(struct shrinker *s, struct shrink_control *sc)
 {
 	struct ashmem_range *range, *next;
+	int nr_to_scan = sc->nr_to_scan;
+	gfp_t gfp_mask = sc->gfp_mask;
 
 	/* We might recurse into filesystem code, so bail out if necessary */
 	if (nr_to_scan && !(gfp_mask & __GFP_FS))
@@ -662,8 +664,13 @@ static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case ASHMEM_PURGE_ALL_CACHES:
 		ret = -EPERM;
 		if (capable(CAP_SYS_ADMIN)) {
-			ret = ashmem_shrink(&ashmem_shrinker, 0, GFP_KERNEL);
-			ashmem_shrink(&ashmem_shrinker, ret, GFP_KERNEL);
+			struct shrink_control sc = {
+				.gfp_mask = GFP_KERNEL,
+				.nr_to_scan = 0,
+			};
+			ret = ashmem_shrink(&ashmem_shrinker, &sc);
+			sc.nr_to_scan = ret;
+			ashmem_shrink(&ashmem_shrinker, &sc);
 		}
 		break;
 	}

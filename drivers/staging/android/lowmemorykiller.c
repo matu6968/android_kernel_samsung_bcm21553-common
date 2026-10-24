@@ -200,7 +200,7 @@ void tune_lmk_param(int *other_free, int *other_file, gfp_t gfp_mask)
 	}
 }
 
-static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
+static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 {
 	struct task_struct *tsk;
 	struct task_struct *selected = NULL;
@@ -213,7 +213,9 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 	int array_size = ARRAY_SIZE(lowmem_adj);
 	int other_free;
 	int other_file;
-	
+	int nr_to_scan = sc->nr_to_scan;
+	gfp_t gfp_mask = sc->gfp_mask;
+
 	tsk = current->group_leader;
 	if ((tsk->flags & PF_EXITING) && test_task_flag(tsk, TIF_MEMDIE)) {
 		set_tsk_thread_flag(current, TIF_MEMDIE);
