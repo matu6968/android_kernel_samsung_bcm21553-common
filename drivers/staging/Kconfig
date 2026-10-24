@@ -138,5 +138,4 @@ source "drivers/staging/media/Kconfig"
 
 source "drivers/staging/bcm21553/Kconfig"
 
-endif # !STAGING_EXCLUDE_BUILD
 endif # STAGING
