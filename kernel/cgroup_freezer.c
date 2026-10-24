@@ -174,8 +174,13 @@ static int freezer_can_attach(struct cgroup_subsys *ss,
 	if ((current != task) && (!capable(CAP_SYS_ADMIN))) {
 		const struct cred *cred = current_cred(), *tcred;
 
+		bool denied;
+
+		rcu_read_lock();
 		tcred = __task_cred(task);
-		if (cred->euid != tcred->uid && cred->euid != tcred->suid)
+		denied = cred->euid != tcred->uid && cred->euid != tcred->suid;
+		rcu_read_unlock();
+		if (denied)
 			return -EPERM;
 	}
 
