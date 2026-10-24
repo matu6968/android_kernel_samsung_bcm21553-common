@@ -97,7 +97,7 @@ static struct nand_ecclayout flexonenand_oob_128 = {
  * oobfree uses the spare area fields marked as
  * "Managed by internal ECC logic for Logical Sector Number area"
  */
-static struct nand_ecclayout onenand_oob_128 = {
+static struct nand_ecclayout onenand_oob_128 __maybe_unused = {
 	.eccbytes	= 64,
 	.eccpos		= {
 		7, 8, 9, 10, 11, 12, 13, 14, 15,
@@ -4068,15 +4068,18 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
 	 */
 	switch (mtd->oobsize) {
 	case 128:
-		if (FLEXONENAND(this)) {
-			this->ecclayout = &flexonenand_oob_128;
-			mtd->subpage_sft = 0;
-		} else {
-			this->ecclayout = &onenand_oob_128;
-			mtd->subpage_sft = 2;
-		}
-		if (ONENAND_IS_NOP_1(this))
-			mtd->subpage_sft = 0;
+		/*
+		 * 3.0 gave non-Flex OneNAND with 128 byte OOB a new layout (3 free
+		 * bytes per 16 byte sector, subpage_sft = 2). The flash in these
+		 * phones (2-plane Muxed OneNAND, 4 KiB pages) was formatted by
+		 * 2.6.x kernels that used 4 free bytes per sector and no subpage
+		 * programming. yaffs2 keeps its tags in the free bytes, so the new
+		 * layout makes every chunk's tags read back shifted, the mount scan
+		 * then treats the chunks as invalid and erases the blocks. Keep the
+		 * on-flash format of the earlier kernels.
+		 */
+		this->ecclayout = &flexonenand_oob_128;
+		mtd->subpage_sft = 0;
 		break;
 	case 64:
 		this->ecclayout = &onenand_oob_64;
