@@ -1816,8 +1816,9 @@ static int cgroup_task_migrate(struct cgroup *cgrp, struct cgroup *oldcgrp,
 
 /*
  * Android: attach permissions are not checked by attach_task_by_pid().
- * Subsystems that implement can_attach() decide for themselves; for the
- * others, require CAP_SYS_ADMIN or a matching uid.
+ * Subsystems that implement can_attach() or can_attach_task() (e.g. the cpu
+ * cgroup, which wants CAP_SYS_NICE) decide for themselves; for the others,
+ * require CAP_SYS_ADMIN or a matching uid.
  */
 static int cgroup_generic_attach_permission(struct task_struct *tsk)
 {
@@ -1868,7 +1869,7 @@ int cgroup_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
 				failed_ss = ss;
 				goto out;
 			}
-		} else {
+		} else if (!ss->can_attach_task) {
 			retval = cgroup_generic_attach_permission(tsk);
 			if (retval) {
 				failed_ss = ss;
@@ -2101,7 +2102,7 @@ int cgroup_attach_proc(struct cgroup *cgrp, struct task_struct *leader)
 				failed_ss = ss;
 				goto out_cancel_attach;
 			}
-		} else {
+		} else if (!ss->can_attach_task) {
 			retval = cgroup_generic_attach_permission(leader);
 			if (retval) {
 				failed_ss = ss;
