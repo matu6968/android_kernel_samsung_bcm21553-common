@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -61,7 +62,10 @@ def verify(source, build, device, aoa):
     require((cfg.get('CONFIG_USB_ANDROID_ACCESSORY') == 'y') == expected_aoa,
             'Unexpected AOA selection')
     release = (build / 'include/config/kernel.release').read_text().strip()
-    require(release == '2.6.39.4', f'Unexpected kernel release: {release}')
+    makefile = (source / 'Makefile').read_text()
+    expected_release = '.'.join(re.search(rf'^{key} = (\d+)', makefile, re.M).group(1)
+                                for key in ('VERSION', 'PATCHLEVEL', 'SUBLEVEL'))
+    require(release == expected_release, f'Unexpected kernel release: {release} (source is {expected_release})')
     zimage = build / 'arch/arm/boot/zImage'
     require(struct.unpack_from('<I', zimage.read_bytes(), 0x24)[0] == 0x016f2818,
             'Invalid ARM zImage header')
