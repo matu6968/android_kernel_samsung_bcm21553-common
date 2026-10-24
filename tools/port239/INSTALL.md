@@ -1,3 +1,10 @@
+> **Note for the 3.0.101 branches:** this guide was written for the 2.6.39.4
+> delivery bundle, and `apply_bundle.sh` has not been used with 3.0.101 images;
+> the 3.0.101 kernel was tested by flashing `boot` with Heimdall and installing the
+> eight modules from recovery. The same paired-install rules apply: the boot image
+> and all eight modules (built from the same tree) go together, and the rollback
+> set must be available before flashing. See `Documentation/bcm21553-port30.md`.
+
 # CM9 / GT-S5360 installation bundle
 
 This candidate is built and checked on the host. It has not been booted on a

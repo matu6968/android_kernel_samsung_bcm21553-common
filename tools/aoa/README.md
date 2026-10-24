@@ -1,6 +1,7 @@
-> This is the historical 2.6.35.7 AOA backport record. On the 2.6.39.4 port
-> branches, use [the port documentation](../../Documentation/bcm21553-port239.md).
-> The hardware results below do not validate the newer kernel.
+> This is the historical 2.6.35.7 AOA backport record. On the 3.0.101 port
+> branches, use [the port documentation](../../Documentation/bcm21553-port30.md).
+> The hardware results below were obtained on 2.6.35.7 and do not validate the
+> newer kernels.
 
 # Galaxy Y AOA 1.0 backport
 
