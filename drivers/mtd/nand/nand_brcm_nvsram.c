@@ -56,9 +56,7 @@ static void __iomem *bcm_nand_io_base;
 static nvsram_cmd addr;
 static uint8_t chip_sel;
 
-#ifdef CONFIG_MTD_PARTITIONS
 const char *part_probes[] = { "cmdlinepart", NULL };
-#endif
 
 static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
 
@@ -885,7 +883,7 @@ static int __devinit bcm_nand_probe(struct platform_device *pdev)
 			return -EIO;
 		}
 
-		add_mtd_partitions(board_mtd, partition_info, nr_partitions);
+		mtd_device_register(board_mtd, partition_info, nr_partitions);
 	}
 
 	/* Return happy */

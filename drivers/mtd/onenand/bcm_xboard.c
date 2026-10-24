@@ -32,9 +32,7 @@
 #define DRIVER_NAME	"onenand"
 
 
-#ifdef CONFIG_MTD_PARTITIONS
 static const char *part_probes[] = { "cmdlinepart", NULL,  };
-#endif
 
 struct onenand_info {
 	struct mtd_info		mtd;
@@ -217,15 +215,13 @@ static int bcm_onenand_probe(struct platform_device *pdev)
 		goto out_free;
 	}
 
-#ifdef CONFIG_MTD_PARTITIONS
 	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
 	if (err > 0)
-		add_mtd_partitions(&info->mtd, info->parts, err);
+		err = mtd_device_register(&info->mtd, info->parts, err);
 	else if (err <= 0 && pdata->parts)
-		add_mtd_partitions(&info->mtd, pdata->parts, pdata->nr_parts);
+		err = mtd_device_register(&info->mtd, pdata->parts, pdata->nr_parts);
 	else
-#endif
-		err = add_mtd_device(&info->mtd);
+		err = mtd_device_register(&info->mtd, NULL, 0);
 
 	dev_set_drvdata(&pdev->dev, info);
 
@@ -243,10 +239,7 @@ static int __devexit bcm_onenand_remove(struct platform_device *pdev)
 	dev_set_drvdata(&pdev->dev, NULL);
 
 	if (info) {
-		if (info->parts)
-			del_mtd_partitions(&info->mtd);
-		else
-			del_mtd_device(&info->mtd);
+		mtd_device_unregister(&info->mtd);
 
 		onenand_release(&info->mtd);
 		kfree(info);

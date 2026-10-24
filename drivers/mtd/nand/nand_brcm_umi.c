@@ -334,9 +334,7 @@ static void bcm_umi_nand_enable_hwecc(struct mtd_info *mtd, int mode)
 	    | REG_UMI_NAND_ECC_CSR_ECCINT_ENABLE;
 }
 
-#ifdef CONFIG_MTD_PARTITIONS
 const char *part_probes[] = { "cmdlinepart", NULL };
-#endif
 
 /**
  * nand_write_buf - write buffer to chip
