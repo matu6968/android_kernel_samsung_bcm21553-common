@@ -1959,8 +1959,9 @@ int __init v3d_opt_init(void)
 	v3d_job_curr = NULL;
 
 	v3d_thread_task = kthread_run(&v3d_thread,v3d_dev,"v3d_thread");
-	if ((int)v3d_thread_task == -ENOMEM) {
+	if (IS_ERR(v3d_thread_task)) {
 		KLOG_E("Kernel Thread did not start [0x%08x]", (int)v3d_thread_task);
+		v3d_thread_task = NULL;
 		ret = -ENOMEM;
 		goto err;
 	}
@@ -1992,7 +1993,7 @@ err:
 	KLOG_E("v3d driver error exit");
 	if (irq_err == 0)
 		free_irq(IRQ_GRAPHICS, v3d_dev);
-	if ((int)v3d_thread_task != -ENOMEM)
+	if (!IS_ERR_OR_NULL(v3d_thread_task))
 		kthread_stop(v3d_thread_task);
 	if (v3d_bin_oom_cpuaddr2)
 		dma_free_coherent(NULL, v3d_bin_oom_size2, v3d_bin_oom_cpuaddr2, v3d_bin_oom_block2);
@@ -2021,7 +2022,7 @@ void __exit v3d_opt_exit(void)
 	KLOG_E("v3d driver exit");
 	if (irq_err == 0)
 		free_irq(IRQ_GRAPHICS, v3d_dev);
-	if ((int)v3d_thread_task != -ENOMEM)
+	if (!IS_ERR_OR_NULL(v3d_thread_task))
 		kthread_stop(v3d_thread_task);
 	if (v3d_bin_oom_cpuaddr2)
 		dma_free_coherent(NULL, v3d_bin_oom_size2, v3d_bin_oom_cpuaddr2, v3d_bin_oom_block2);

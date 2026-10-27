@@ -22,6 +22,7 @@
 #include <linux/bootmem.h>
 #include <linux/memblock.h>
 #include <linux/vmalloc.h>
+#include <linux/dma-mapping.h>
 #include <mach/setup.h>
 #include <asm/setup.h>
 #include <linux/dma-mapping.h>
@@ -266,6 +267,13 @@ int bcm21553_l2_evt_buf_init(void)
 
 void __init bcm21553_map_io(void)
 {
+	/*
+	 * Since 3.1 the size of the coherent DMA area is no longer taken from
+	 * CONSISTENT_DMA_SIZE in <mach/memory.h>; without this call it stays at 2 MiB
+	 * and the 3 MiB buffers of the v3d driver (and others) fail to allocate.
+	 */
+	init_consistent_dma_size(CONSISTENT_DMA_SIZE);
+
 	iotable_init(bcm21553_io_desc, ARRAY_SIZE(bcm21553_io_desc));
 
 	/* as soon as INFORM3 is visible, sec_debug is ready to run */
