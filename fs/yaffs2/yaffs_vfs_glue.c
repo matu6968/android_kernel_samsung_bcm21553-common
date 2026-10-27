@@ -238,7 +238,10 @@ static int yaffs_file_flush(struct file *file, fl_owner_t id);
 static int yaffs_file_flush(struct file *file);
 #endif
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 34))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0))
+static int yaffs_sync_object(struct file *file, loff_t start, loff_t end,
+				int datasync);
+#elif (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 34))
 static int yaffs_sync_object(struct file *file, int datasync);
 #else
 static int yaffs_sync_object(struct file *file, struct dentry *dentry,
@@ -1362,7 +1365,7 @@ static void yaffs_FillInodeFromObject(struct inode *inode, yaffs_Object *obj)
 		inode->i_size = yaffs_GetObjectFileLength(obj);
 		inode->i_blocks = (inode->i_size + 511) >> 9;
 
-		inode->i_nlink = yaffs_GetObjectLinkCount(obj);
+		set_nlink(inode, yaffs_GetObjectLinkCount(obj));
 
 		YAFFS_TRACE(YAFFS_TRACE_OS,
 			(TSTR("yaffs_FillInode mode %x uid %d gid %d size %d count %d\n"),
@@ -1694,8 +1697,8 @@ static int yaffs_init_security(struct inode *dir, struct dentry *dentry,
 	yaffs_Object *obj = yaffs_InodeToObject(inode);
 	int result;
 
-	err = security_inode_init_security(inode, dir, &dentry->d_name,
-					   &suffix, &value, &size);
+	err = security_old_inode_init_security(inode, dir, &dentry->d_name,
+					       &suffix, &value, &size);
 	if (err) {
 		if (err == -EOPNOTSUPP)
 			return 0;
@@ -1847,7 +1850,7 @@ static int yaffs_unlink(struct inode *dir, struct dentry *dentry)
 	retVal = yaffs_Unlink(obj, dentry->d_name.name);
 
 	if (retVal == YAFFS_OK) {
-		dentry->d_inode->i_nlink--;
+		drop_nlink(dentry->d_inode);
 		dir->i_version++;
 		yaffs_GrossUnlock(dev);
 		mark_inode_dirty(dentry->d_inode);
@@ -1881,7 +1884,7 @@ static int yaffs_link(struct dentry *old_dentry, struct inode *dir,
 			obj);
 
 	if (link) {
-		old_dentry->d_inode->i_nlink = yaffs_GetObjectLinkCount(obj);
+		set_nlink(old_dentry->d_inode, yaffs_GetObjectLinkCount(obj));
 		d_instantiate(dentry, old_dentry->d_inode);
 		atomic_inc(&old_dentry->d_inode->i_count);
 		YAFFS_TRACE(YAFFS_TRACE_OS,
@@ -1932,7 +1935,10 @@ static int yaffs_symlink(struct inode *dir, struct dentry *dentry,
 	return -ENOMEM;
 }
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 34))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0))
+static int yaffs_sync_object(struct file *file, loff_t start, loff_t end,
+				int datasync)
+#elif (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 34))
 static int yaffs_sync_object(struct file *file, int datasync)
 #else
 static int yaffs_sync_object(struct file *file, struct dentry *dentry,
@@ -1945,6 +1951,19 @@ static int yaffs_sync_object(struct file *file, struct dentry *dentry,
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 34))
 	struct dentry *dentry = file->f_path.dentry;
 #endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0))
+	struct inode *inode = dentry->d_inode;
+	int err;
+
+	/*
+	 * Since 3.1 the VFS no longer writes back the page cache or takes
+	 * i_mutex before calling ->fsync(), the filesystem has to do it.
+	 */
+	err = filemap_write_and_wait_range(inode->i_mapping, start, end);
+	if (err)
+		return err;
+	mutex_lock(&inode->i_mutex);
+#endif
 
 	obj = yaffs_DentryToObject(dentry);
 
@@ -1955,6 +1974,9 @@ static int yaffs_sync_object(struct file *file, struct dentry *dentry,
 	yaffs_GrossLock(dev);
 	yaffs_FlushFile(obj, 1, datasync);
 	yaffs_GrossUnlock(dev);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0))
+	mutex_unlock(&inode->i_mutex);
+#endif
 	return 0;
 }
 
@@ -2000,7 +2022,7 @@ static int yaffs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	if (retVal == YAFFS_OK) {
 		if (target) {
-			new_dentry->d_inode->i_nlink--;
+			drop_nlink(new_dentry->d_inode);
 			mark_inode_dirty(new_dentry->d_inode);
 		}
 		
@@ -2029,7 +2051,7 @@ static int yaffs_setattr(struct dentry *dentry, struct iattr *attr)
 		error = -EINVAL;
 
 	if (error == 0)
-		error = inode_change_ok(inode, attr);
+		error = setattr_prepare(dentry, attr);
 	if (error == 0) {
 		int result;
 		if (!error){

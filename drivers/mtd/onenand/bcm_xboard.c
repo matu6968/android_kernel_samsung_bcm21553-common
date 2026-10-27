@@ -215,13 +215,8 @@ static int bcm_onenand_probe(struct platform_device *pdev)
 		goto out_free;
 	}
 
-	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
-	if (err > 0)
-		err = mtd_device_register(&info->mtd, info->parts, err);
-	else if (err <= 0 && pdata->parts)
-		err = mtd_device_register(&info->mtd, pdata->parts, pdata->nr_parts);
-	else
-		err = mtd_device_register(&info->mtd, NULL, 0);
+	err = mtd_device_parse_register(&info->mtd, part_probes, NULL,
+					pdata->parts, pdata->nr_parts);
 
 	dev_set_drvdata(&pdev->dev, info);
 

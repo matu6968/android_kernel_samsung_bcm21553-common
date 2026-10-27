@@ -855,7 +855,7 @@ static int __devinit bcm_nand_probe(struct platform_device *pdev)
 	chip->bbt_td = &bbt_main_descr;
 	chip->bbt_md = &bbt_mirror_descr;
 
-	chip->options |= NAND_USE_FLASH_BBT;
+	chip->bbt_options |= NAND_BBT_USE_FLASH;
 
 	/* Now finish off the scan, now that ecc has been initialized. */
 	err = nand_scan_tail(board_mtd);
@@ -868,22 +868,16 @@ static int __devinit bcm_nand_probe(struct platform_device *pdev)
 
 	/* Register the partitions */
 	{
-		int nr_partitions;
-		struct mtd_partition *partition_info;
-
 		board_mtd->name = "bcm_umi-nand";
-		nr_partitions = parse_mtd_partitions(board_mtd, part_probes,
-						     &partition_info, 0);
-
-		if (nr_partitions <= 0) {
-			pr_err("BCM NAND: Too few partitions-%d\n",
-			       nr_partitions);
+		err = mtd_device_parse_register(board_mtd, part_probes, NULL,
+						NULL, 0);
+		if (err) {
+			pr_err("BCM NAND: partition registration failed-%d\n",
+			       err);
 			iounmap(bcm_nand_io_base);
 			kfree(board_mtd);
 			return -EIO;
 		}
-
-		mtd_device_register(board_mtd, partition_info, nr_partitions);
 	}
 
 	/* Return happy */

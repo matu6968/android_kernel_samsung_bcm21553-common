@@ -127,7 +127,7 @@ int nandmtd1_WriteChunkWithTagsToNAND(yaffs_Device *dev,
 #endif
 
 	memset(&ops, 0, sizeof(ops));
-	ops.mode = MTD_OOB_AUTO;
+	ops.mode = MTD_OPS_AUTO_OOB;
 	ops.len = (data) ? chunkBytes : 0;
 	ops.ooblen = YTAG1_SIZE;
 	ops.datbuf = (__u8 *)data;
@@ -179,7 +179,7 @@ int nandmtd1_ReadChunkWithTagsFromNAND(yaffs_Device *dev,
 	int deleted;
 
 	memset(&ops, 0, sizeof(ops));
-	ops.mode = MTD_OOB_AUTO;
+	ops.mode = MTD_OPS_AUTO_OOB;
 	ops.len = (data) ? chunkBytes : 0;
 	ops.ooblen = YTAG1_SIZE;
 	ops.datbuf = data;

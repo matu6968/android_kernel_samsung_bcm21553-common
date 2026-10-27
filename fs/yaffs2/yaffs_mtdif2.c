@@ -71,7 +71,7 @@ int nandmtd2_WriteChunkWithTagsToNAND(yaffs_Device *dev, int chunkInNAND,
 		yaffs_PackTags2(&pt, tags, !dev->param.noTagsECC);
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 17))
-	ops.mode = MTD_OOB_AUTO;
+	ops.mode = MTD_OPS_AUTO_OOB;
 	ops.ooblen = (dev->param.inbandTags) ? 0 : packed_tags_size;
 	ops.len = dev->param.totalBytesPerChunk;
 	ops.ooboffs = 0;
@@ -136,7 +136,7 @@ int nandmtd2_ReadChunkWithTagsFromNAND(yaffs_Device *dev, int chunkInNAND,
 		retval = mtd->read(mtd, addr, dev->param.totalBytesPerChunk,
 				&dummy, data);
 	else if (tags) {
-		ops.mode = MTD_OOB_AUTO;
+		ops.mode = MTD_OPS_AUTO_OOB;
 		ops.ooblen = packed_tags_size;
 		ops.len = data ? dev->nDataBytesPerChunk : packed_tags_size;
 		ops.ooboffs = 0;
