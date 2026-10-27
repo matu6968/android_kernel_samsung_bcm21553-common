@@ -95,11 +95,17 @@ start_readmac:
 
 	}
 
-	if(ret)
-		sscanf(buf,"%02X:%02X:%02X:%02X:%02X:%02X",
-				&mac->octet[0], &mac->octet[1], &mac->octet[2],
-				&mac->octet[3], &mac->octet[4], &mac->octet[5]);
-	else
+	if(ret) {
+		/* %X stores an unsigned int: never point it at a byte array */
+		unsigned int o[6];
+		int i;
+
+		if (sscanf(buf, "%02X:%02X:%02X:%02X:%02X:%02X",
+				&o[0], &o[1], &o[2], &o[3], &o[4], &o[5]) == 6) {
+			for (i = 0; i < 6; i++)
+				mac->octet[i] = o[i];
+		}
+	} else
 		DHD_ERROR(("dhd_bus_start: Reading from the '%s' returns 0 bytes\n", filepath));
 
 	if (fp)
