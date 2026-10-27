@@ -16,6 +16,7 @@
 /*
  * AthenaRay board specific driver definitions
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -1998,7 +1999,7 @@ static void __init bcm21553_init_machine(void)
 /* TODO: Replace BCM1160 with BCM21553/AthenaRay once registered */
 MACHINE_START(BCM1160, "BCM21553 ThunderbirdEDN31 platform")
 	/* Maintainer: Broadcom Corporation */
-	.boot_params = (PHYS_OFFSET + 0x100),
+	.atag_offset = 0x100,
 	.map_io = bcm21553_map_io,
 	.reserve = bcm21553_reserve,
 	.init_irq = bcm21553_init_irq,

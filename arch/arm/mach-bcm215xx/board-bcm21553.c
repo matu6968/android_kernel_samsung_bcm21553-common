@@ -16,6 +16,7 @@
 /*
  * AthenaRay board specific driver definitions
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -3536,7 +3537,7 @@ MACHINE_START(BCM1160, "GT-S5360 Board")
 MACHINE_START(BCM1160, "GT-S5830I Board")
 #endif
 	/* Maintainer: Broadcom Corporation */
-	.boot_params = (PHYS_OFFSET + 0x100),
+	.atag_offset = 0x100,
 	.map_io = bcm21553_map_io,
 	.reserve = bcm21553_reserve,
 	.init_irq = bcm21553_init_irq,

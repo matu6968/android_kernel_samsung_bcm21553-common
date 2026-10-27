@@ -19,6 +19,7 @@
 //! \note  
 //!
 //============================================================================
+#include <linux/module.h>
 #include <plat/chal/chal_types.h>
 #include <plat/chal/chal_common.h>
 #include <plat/osdal_os.h>

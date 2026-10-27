@@ -23,6 +23,7 @@
 * other than the GPL, without Broadcom's express prior written consent.
 *******************************************************************************/
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/err.h>
 #include <linux/clk.h>

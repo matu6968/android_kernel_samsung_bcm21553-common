@@ -13,6 +13,7 @@
 * other than the GPL, without Broadcom's express prior written consent.
 *******************************************************************************/
 
+#include <linux/module.h>
 #include <linux/cpuidle.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -63,6 +64,7 @@ static struct bcm21553_cpuidle_state bcm_cpu_states[] = {
 };
 
 DEFINE_PER_CPU(struct cpuidle_device, bcm21553_idle_dev);
+static struct cpuidle_driver bcm21553_idle_driver;
 
 /*********************************************************************
  *                             DEBUG CODE                            *
@@ -145,7 +147,6 @@ static void cmd_show_usage(void)
  */
 static void cmd_change_state(const char *p)
 {
-	struct cpuidle_device *dev;
 #define FIELD_SIZE	10
 #define MAX_CPUS	1
 	char field[FIELD_SIZE + 1];
@@ -199,28 +200,24 @@ static void cmd_change_state(const char *p)
 
 	pr_info("Setting field '%s' of state%d to %u\n", field, state, value);
 
-	dev = &per_cpu(bcm21553_idle_dev, cpu);
 	if (strncmp("exit", field, 4) == 0)
-		dev->states[state].exit_latency = value;
+		bcm21553_idle_driver.states[state].exit_latency = value;
 	else if (strncmp("target", field, 4) == 0)
-		dev->states[state].target_residency = value;
+		bcm21553_idle_driver.states[state].target_residency = value;
 }
 
 static void cmd_show_cntrs(const char *p)
 {
-	struct cpuidle_device *dev;
 	int i;
 
 	pr_info("log_lvl: 0x%x, idle_time: %d\n", cpu_dbg.log_lvl,
 		cpu_dbg.idle_time);
 
-	/* Get handle of current cpu */
-	dev = &per_cpu(bcm21553_idle_dev, smp_processor_id());
 	for (i = 0; i < BCM21553_MAX_CPU_STATES; i++)
 		pr_info("state%d:%lu, exit_latency:%u, target_residency: %u\n",
 			i, cpu_dbg.state_cntr[i],
-			dev->states[i].exit_latency,
-			dev->states[i].target_residency);
+			bcm21553_idle_driver.states[i].exit_latency,
+			bcm21553_idle_driver.states[i].target_residency);
 }
 
 static void cmd_set_log_lvl(const char *p)
@@ -289,10 +286,10 @@ static int param_get_cpu_dbg(char *buffer, const struct kernel_param *kp)
  *********************************************************************/
 
 static int bcm21553_cpuidle_handler(struct cpuidle_device *dev,
-				    struct cpuidle_state *state)
+				    struct cpuidle_driver *drv, int index)
 {
 	struct timeval before, after;
-	struct bcm21553_cpuidle_state *cpu = cpuidle_get_statedata(state);
+	struct bcm21553_cpuidle_state *cpu = &bcm_cpu_states[index];
 	int idle_time;
 
 	local_irq_disable();
@@ -311,7 +308,9 @@ static int bcm21553_cpuidle_handler(struct cpuidle_device *dev,
 	if (DEBUG_FLOW_ENABLED)
 		instrument_cpuidle(cpu, idle_time);
 
-	return idle_time;
+	dev->last_residency = idle_time;
+
+	return index;
 }
 
 /*********************************************************************
@@ -321,6 +320,8 @@ static int bcm21553_cpuidle_handler(struct cpuidle_device *dev,
 static struct cpuidle_driver bcm21553_idle_driver = {
 	.name = "bcm21553_idle",
 	.owner = THIS_MODULE,
+	.state_count = BCM21553_MAX_CPU_STATES,
+	.safe_state_index = BCM21553_SAFE_STATE,
 };
 
 static int __init cpuidle_drv_init(void)
@@ -331,6 +332,18 @@ static int __init cpuidle_drv_init(void)
 
 	pr_info("%s\n", __func__);
 
+	/* The 3.2 cpuidle core keeps the state table in the driver */
+	for (i = 0; i < BCM21553_MAX_CPU_STATES; i++) {
+		state = &bcm21553_idle_driver.states[i];
+
+		strncpy(state->name, bcm_cpu_states[i].name, CPUIDLE_NAME_LEN);
+		strncpy(state->desc, bcm_cpu_states[i].desc, CPUIDLE_DESC_LEN);
+		state->flags = bcm_cpu_states[i].flags;
+		state->exit_latency = bcm_cpu_states[i].exit_latency;
+		state->target_residency = bcm_cpu_states[i].target_residency;
+		state->enter = bcm21553_cpuidle_handler;
+	}
+
 	/* Register CPUIDLE driver */
 	ret = cpuidle_register_driver(&bcm21553_idle_driver);
 	if (ret < 0) {
@@ -339,19 +352,8 @@ static int __init cpuidle_drv_init(void)
 	}
 
 	dev = &per_cpu(bcm21553_idle_dev, smp_processor_id());
-	for (i = 0; i < BCM21553_MAX_CPU_STATES; i++) {
-		state = &dev->states[i];
-
-		strncpy(state->name, bcm_cpu_states[i].name, CPUIDLE_NAME_LEN);
-		strncpy(state->desc, bcm_cpu_states[i].desc, CPUIDLE_DESC_LEN);
-		cpuidle_set_statedata(state, &bcm_cpu_states[i]);
-		state->flags = bcm_cpu_states[i].flags;
-		state->exit_latency = bcm_cpu_states[i].exit_latency;
-		state->target_residency = bcm_cpu_states[i].target_residency;
-		state->enter = bcm21553_cpuidle_handler;
-	}
+	dev->cpu = smp_processor_id();
 	dev->state_count = BCM21553_MAX_CPU_STATES;
-	dev->safe_state = BCM21553_SAFE_STATE;
 
 	/* Register CPUIDLE device */
 	ret = cpuidle_register_device(dev);

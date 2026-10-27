@@ -22,6 +22,7 @@
 	@defgroup InterruptAPIGroup Interrupt API's
 	@brief defines the Broadcom specific interrupt API's
 */
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/io.h>

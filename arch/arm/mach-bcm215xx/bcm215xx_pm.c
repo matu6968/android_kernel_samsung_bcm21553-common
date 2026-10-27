@@ -27,7 +27,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/time.h>
 #include <linux/math64.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <asm/outercache.h>
 #include <asm/hardware/cache-l2x0.h>
 
@@ -275,7 +275,7 @@ static void cmd_show_susp_snapshot(const char *p)
 
 static void cmd_set_pm_qos(const char *p)
 {
-	static struct pm_qos_request_list pm_qos_req;
+	static struct pm_qos_request pm_qos_req;
 	int qos;
 
 	if (*p == 'a') {

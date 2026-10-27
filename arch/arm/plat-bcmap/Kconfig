@@ -6,6 +6,7 @@ choice
 
 config ARCH_BCM116X
 	select CPU_V6
+	select NEED_MACH_MEMORY_H
 	select HAVE_CLK
 	select COMMON_CLKDEV
         bool "Broadcom BCM116X Family"
@@ -17,6 +18,7 @@ config ARCH_BCM116X
 
 config ARCH_BCM215XX
 	select CPU_V6K
+	select NEED_MACH_MEMORY_H
 	select HAVE_CLK
 	select COMMON_CLKDEV
         bool "Broadcom BCM215XX Family"
