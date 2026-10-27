@@ -13,6 +13,7 @@ def main():
     parser.add_argument('--source', type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument('--cross-compile', required=True)
     parser.add_argument('--report', type=Path, required=True)
+    parser.add_argument('--build', type=Path, help='build output directory of the ported tree (3.2 generates asm wrappers there)')
     args = parser.parse_args()
     here = Path(__file__).resolve().parent
     values = {}
@@ -27,6 +28,8 @@ def main():
                 '-I' + str(here / 'abi-include'), '-I' + str(root / 'include'),
                 '-I' + str(root / 'arch/arm/include'),
                 '-I' + str(root / 'drivers/staging/android'),
+                *(['-I' + str(args.build / 'arch/arm/include/generated'), '-I' + str(args.build / 'include')]
+                  if label == 'ported' and args.build else []),
                 str(here / 'abi_probe.c'), '-o', str(obj)], check=True)
             subprocess.run([args.cross_compile + 'objcopy', '-O', 'binary',
                             '--only-section=.rodata', str(obj), str(binary)], check=True)

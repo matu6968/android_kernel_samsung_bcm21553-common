@@ -1,11 +1,11 @@
-# BCM21553 Linux 3.0.101 kernel
+# BCM21553 Linux 3.2.102 kernel
 
 Samsung/Broadcom support for Galaxy Y (`totoro`), Galaxy Ace VE (`cooperve`)
 and Galaxy Mini VE (`tassve`), retaining the Android and AOA changes, on the
-last release of the Linux 3.0 series.
+last release of the Linux 3.2 series.
 
-See [the port documentation](Documentation/bcm21553-port30.md) for branch
-selection, the pinned compiler, the changes needed for 3.0, the OneNAND layout
+See [the port documentation](Documentation/bcm21553-port32.md) for branch
+selection, the pinned compiler, the changes needed for 3.2, the OneNAND layout
 caveat and what has been tested.
 
 ```sh

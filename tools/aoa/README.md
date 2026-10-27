@@ -1,5 +1,5 @@
-> This is the historical 2.6.35.7 AOA backport record. On the 3.0.101 port
-> branches, use [the port documentation](../../Documentation/bcm21553-port30.md).
+> This is the historical 2.6.35.7 AOA backport record. On the 3.2.102 and 3.0.101 port
+> branches, use [the port documentation](../../Documentation/bcm21553-port32.md).
 > The hardware results below were obtained on 2.6.35.7 and do not validate the
 > newer kernels.
 
