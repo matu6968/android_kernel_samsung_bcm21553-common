@@ -39,7 +39,7 @@ int brcm_retrive_early_printk()
 	}
 
 	lockdep_off();
-	spin_lock(&logbuf_lock);
+	raw_spin_lock(&logbuf_lock);
 	printk_cpu = this_cpu;
 
 	if (bcmlog_log_ulogging_id > 0)
