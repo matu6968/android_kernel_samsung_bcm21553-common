@@ -491,7 +491,7 @@ static int rndis_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 					rndis->hs.notify,
 					rndis->fs.notify);
 		}
-		usb_ep_enable(rndis->notify, rndis->notify_desc);
+		usb_ep_enable_desc(rndis->notify, rndis->notify_desc);
 		rndis->notify->driver_data = rndis;
 
 	} else if (intf == rndis->data_id) {

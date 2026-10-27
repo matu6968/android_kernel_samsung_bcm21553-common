@@ -12,6 +12,7 @@
 
 /* #define VERBOSE_DEBUG */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <linux/usb/android_composite.h>
@@ -464,7 +465,7 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		acm->notify_desc = ep_choose(cdev->gadget,
 				acm->hs.notify,
 				acm->fs.notify);
-		usb_ep_enable(acm->notify, acm->notify_desc);
+		usb_ep_enable_desc(acm->notify, acm->notify_desc);
 		acm->notify->driver_data = acm;
 
 	} else if (intf == acm->data_id) {

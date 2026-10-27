@@ -469,7 +469,7 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 					ecm->hs.notify,
 					ecm->fs.notify);
 		}
-		usb_ep_enable(ecm->notify, ecm->notify_desc);
+		usb_ep_enable_desc(ecm->notify, ecm->notify_desc);
 		ecm->notify->driver_data = ecm;
 
 	/* Data interface has two altsettings, 0 and 1 */

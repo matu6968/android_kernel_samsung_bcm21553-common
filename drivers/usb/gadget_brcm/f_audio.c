@@ -9,6 +9,7 @@
  * Licensed under the GPL-2 or later.
  */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <asm/atomic.h>
@@ -501,7 +502,7 @@ static int f_audio_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	if (intf == 1) {
 		if (alt == 1) {
-			usb_ep_enable(out_ep, audio->out_desc);
+			usb_ep_enable_desc(out_ep, audio->out_desc);
 			out_ep->driver_data = audio;
 			audio->copy_buf = f_audio_buffer_alloc(audio_buf_size);
 

@@ -32,6 +32,7 @@ Broadcom's express prior written consent.
 
 /* #define VERBOSE_DEBUG */
 
+#include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>

@@ -571,13 +571,13 @@ static int adb_function_set_alt(struct usb_function *f,
 	int ret;
 
 	DBG(cdev, "adb_function_set_alt intf: %d alt: %d\n", intf, alt);
-	ret = usb_ep_enable(dev->ep_in,
+	ret = usb_ep_enable_desc(dev->ep_in,
 			ep_choose(cdev->gadget,
 				&adb_highspeed_in_desc,
 				&adb_fullspeed_in_desc));
 	if (ret)
 		return ret;
-	ret = usb_ep_enable(dev->ep_out,
+	ret = usb_ep_enable_desc(dev->ep_out,
 			ep_choose(cdev->gadget,
 				&adb_highspeed_out_desc,
 				&adb_fullspeed_out_desc));

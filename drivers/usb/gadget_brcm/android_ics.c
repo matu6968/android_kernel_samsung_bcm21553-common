@@ -6,6 +6,7 @@
  * Keep the vendor functions and controller. Stage a composition while the
  * pullup is down, then publish it atomically on enable, as ICS init expects.
  */
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/device.h>

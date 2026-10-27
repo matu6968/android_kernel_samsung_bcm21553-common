@@ -49,6 +49,7 @@
 
 /* #define VERBOSE_DEBUG */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/utsname.h>
 #include <linux/device.h>

@@ -21,6 +21,7 @@
 
 /* #define VERBOSE_DEBUG */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
 
@@ -261,14 +262,14 @@ enable_loopback(struct usb_composite_dev *cdev, struct f_loopback *loop)
 
 	/* one endpoint writes data back IN to the host */
 	ep = loop->in_ep;
-	result = usb_ep_enable(ep, src);
+	result = usb_ep_enable_desc(ep, src);
 	if (result < 0)
 		return result;
 	ep->driver_data = loop;
 
 	/* one endpoint just reads OUT packets */
 	ep = loop->out_ep;
-	result = usb_ep_enable(ep, sink);
+	result = usb_ep_enable_desc(ep, sink);
 	if (result < 0) {
 fail0:
 		ep = loop->in_ep;

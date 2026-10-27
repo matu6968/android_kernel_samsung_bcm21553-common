@@ -230,6 +230,7 @@
 /* #define DUMP_MSGS */
 
 
+#include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/completion.h>
 #include <linux/dcache.h>
@@ -3206,7 +3207,7 @@ static int enable_endpoint(struct fsg_dev *fsg, struct usb_ep *ep,
 	int	rc;
 
 	ep->driver_data = fsg;
-	rc = usb_ep_enable(ep, d);
+	rc = usb_ep_enable_desc(ep, d);
 	if (rc)
 		ERROR(fsg, "can't enable %s, result %d\n", ep->name, rc);
 	return rc;

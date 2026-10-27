@@ -209,7 +209,7 @@ find_ep (struct usb_gadget *gadget, const char *name)
  * By choosing an endpoint to use with the specified descriptor, this
  * routine simplifies writing gadget drivers that work with multiple
  * USB device controllers.  The endpoint would be passed later to
- * usb_ep_enable(), along with some descriptor.
+ * usb_ep_enable_desc(), along with some descriptor.
  *
  * That second descriptor won't always be the same as the first one.
  * For example, isochronous endpoints can be autoconfigured for high

@@ -899,13 +899,13 @@ set_printer_interface(struct printer_dev *dev)
 	dev->out = ep_desc(dev->gadget, &hs_ep_out_desc, &fs_ep_out_desc);
 	dev->out_ep->driver_data = dev;
 
-	result = usb_ep_enable(dev->in_ep, dev->in);
+	result = usb_ep_enable_desc(dev->in_ep, dev->in);
 	if (result != 0) {
 		DBG(dev, "enable %s --> %d\n", dev->in_ep->name, result);
 		goto done;
 	}
 
-	result = usb_ep_enable(dev->out_ep, dev->out);
+	result = usb_ep_enable_desc(dev->out_ep, dev->out);
 	if (result != 0) {
 		DBG(dev, "enable %s --> %d\n", dev->in_ep->name, result);
 		goto done;
@@ -1114,9 +1114,9 @@ static void printer_soft_reset(struct printer_dev *dev)
 		list_add(&req->list, &dev->tx_reqs);
 	}
 
-	if (usb_ep_enable(dev->in_ep, dev->in))
+	if (usb_ep_enable_desc(dev->in_ep, dev->in))
 		DBG(dev, "Failed to enable USB in_ep\n");
-	if (usb_ep_enable(dev->out_ep, dev->out))
+	if (usb_ep_enable_desc(dev->out_ep, dev->out))
 		DBG(dev, "Failed to enable USB out_ep\n");
 
 	wake_up_interruptible(&dev->rx_wait);

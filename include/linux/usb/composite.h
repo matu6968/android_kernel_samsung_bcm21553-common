@@ -166,6 +166,23 @@ int usb_interface_id(struct usb_configuration *, struct usb_function *);
 
 int config_ep_by_speed(struct usb_gadget *g, struct usb_function *f,
 			struct usb_ep *_ep);
+/*
+ * The Broadcom gadget stack still passes the descriptor explicitly: since 3.1
+ * usb_ep_enable() takes it from ep->desc.
+ */
+static inline int usb_ep_enable_desc(struct usb_ep *ep,
+				     const struct usb_endpoint_descriptor *desc)
+{
+	ep->desc = desc;
+	return usb_ep_enable(ep);
+}
+
+/* removed from <linux/usb/gadget.h> in 3.1, still implemented in gadget_brcm/config.c */
+struct usb_endpoint_descriptor *usb_find_endpoint(
+	struct usb_descriptor_header **src,
+	struct usb_descriptor_header **copy,
+	struct usb_endpoint_descriptor *match);
+
 void usb_function_set_enabled(struct usb_function *, int);
 void usb_composite_force_reset(struct usb_composite_dev *);
 

@@ -9,6 +9,7 @@
  * Licensed under the GPL-2 or later.
  */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <linux/delay.h>

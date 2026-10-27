@@ -755,13 +755,13 @@ static int acc_function_set_alt(struct usb_function *f,
 		usb_ep_disable(dev->ep_in);
 		usb_ep_disable(dev->ep_out);
 	}
-	ret = usb_ep_enable(dev->ep_in,
+	ret = usb_ep_enable_desc(dev->ep_in,
 			ep_choose(cdev->gadget,
 				&acc_highspeed_in_desc,
 				&acc_fullspeed_in_desc));
 	if (ret)
 		return ret;
-	ret = usb_ep_enable(dev->ep_out,
+	ret = usb_ep_enable_desc(dev->ep_out,
 			ep_choose(cdev->gadget,
 				&acc_highspeed_out_desc,
 				&acc_fullspeed_out_desc));

@@ -430,8 +430,8 @@ static int pn_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			in = ep_choose(gadget,
 					&pn_hs_source_desc,
 					&pn_fs_source_desc);
-			usb_ep_enable(fp->out_ep, out);
-			usb_ep_enable(fp->in_ep, in);
+			usb_ep_enable_desc(fp->out_ep, out);
+			usb_ep_enable_desc(fp->in_ep, in);
 
 			port->usb = fp;
 			fp->out_ep->driver_data = fp;
