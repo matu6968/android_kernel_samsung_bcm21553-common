@@ -26,6 +26,7 @@
  */
 
 #ifdef CONFIG_WIFI_CONTROL_FUNC
+#include <linux/module.h>
 #include <linux/platform_device.h>
 #endif
 #include <typedefs.h>

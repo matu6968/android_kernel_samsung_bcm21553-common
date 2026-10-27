@@ -24,6 +24,7 @@
  * $Id: bcmsdspi_linux.c,v 1.7.2.1.4.3 2008/06/30 21:09:36 Exp $
  */
 
+#include <linux/module.h>
 #include <typedefs.h>
 #include <pcicfg.h>
 #include <bcmutils.h>

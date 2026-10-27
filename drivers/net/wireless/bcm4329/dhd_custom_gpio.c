@@ -24,6 +24,7 @@
 */
 
 
+#include <linux/module.h>
 #include <typedefs.h>
 #include <linuxver.h>
 #include <osl.h>

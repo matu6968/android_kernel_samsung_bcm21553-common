@@ -187,7 +187,7 @@ config BRCM_NETCONSOLE_DYNAMIC
           See <file:Documentation/networking/netconsole.txt> for details.
 
 config NETPOLL
-	def_bool NETCONSOLE
+	def_bool NETCONSOLE || BRCM_NETCONSOLE
 
 config NETPOLL_TRAP
 	bool "Netpoll traffic trapping"

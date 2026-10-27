@@ -24,6 +24,7 @@
  * $Id: dhd_sdio.c,v 1.157.2.27.2.33.2.129.4.1 2010/09/02 23:13:16 Exp $
  */
 
+#include <linux/module.h>
 #include <typedefs.h>
 #include <osl.h>
 #include <bcmsdh.h>

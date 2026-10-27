@@ -25,6 +25,7 @@
  * $Id: dhd_linux.c,v 1.131.2.49.2.4 2011-02-10 17:56:58 Exp $
  */
 
+#include <linux/module.h>
 #include <typedefs.h>
 #include <linuxver.h>
 #include <osl.h>
@@ -69,8 +70,8 @@
 extern void cmd_set_pm_qos(const char *);
 struct cpufreq_client_desc *wlan_enc_client=NULL;
 EXPORT_SYMBOL(wlan_enc_client);
-#include <linux/pm_qos_params.h>
-static struct pm_qos_request_list *wlan_driver_pm_qos_req=NULL;
+#include <linux/pm_qos.h>
+static struct pm_qos_request *wlan_driver_pm_qos_req=NULL;
 #endif
 
 

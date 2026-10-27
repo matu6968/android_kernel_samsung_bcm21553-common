@@ -24,6 +24,7 @@
  * $Id: bcmsdh_sdmmc_linux.c,v 1.1.2.5.6.17 2010/08/13 00:36:19 Exp $
  */
 
+#include <linux/module.h>
 #include <typedefs.h>
 #include <bcmutils.h>
 #include <sdio.h>	/* SDIO Specs */

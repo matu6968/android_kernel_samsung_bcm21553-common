@@ -24,6 +24,7 @@
  * $Id: bcmsdh_sdmmc_linux.c 308645 2012-01-17 02:33:26Z $
  */
 
+#include <linux/module.h>
 #include <typedefs.h>
 #include <bcmutils.h>
 #include <sdio.h>	/* SDIO Device and Protocol Specs */

@@ -23,6 +23,7 @@
 * $Id: dhd_custom_gpio.c,v 1.2.42.1 2010-10-19 00:41:09 Exp $
 */
 
+#include <linux/module.h>
 #include <typedefs.h>
 #include <linuxver.h>
 #include <osl.h>

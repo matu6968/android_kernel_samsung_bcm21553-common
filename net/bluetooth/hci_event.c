@@ -1456,9 +1456,6 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 	if (conn->type == ACL_LINK)
 		hci_sco_setup(conn, ev->status);
 
-	if (conn->type == ACL_LINK)
-		hci_sco_setup(conn, ev->status);
-
 	if (ev->status) {
 		hci_proto_connect_cfm(conn, ev->status);
 		hci_conn_del(conn);
