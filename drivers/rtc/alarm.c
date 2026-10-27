@@ -13,6 +13,7 @@
  *
  */
 
+#include <linux/module.h>
 #include <asm/mach/time.h>
 #include <linux/android_alarm.h>
 #include <linux/device.h>

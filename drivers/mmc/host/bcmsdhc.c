@@ -12,6 +12,7 @@
 * software in any way with any other Broadcom software provided under a license
 * other than the GPL, without Broadcom's express prior written consent.
 *******************************************************************************/
+#include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/highmem.h>
 #include <linux/io.h>
@@ -29,7 +30,7 @@
 #include <linux/slab.h>
 /* #include <asm/mach/mmc.h> */
 #include <linux/init.h>
-#include <linux/pm_qos_params.h>
+#include <linux/pm_qos.h>
 #include <linux/regulator/consumer.h>
 
 #ifndef CONFIG_ARCH_BCM215XX

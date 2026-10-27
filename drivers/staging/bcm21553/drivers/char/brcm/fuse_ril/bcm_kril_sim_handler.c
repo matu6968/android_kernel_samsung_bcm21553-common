@@ -12,6 +12,7 @@
 *   other than the GPL, without Broadcom's express prior written consent.
 *
 ****************************************************************************/
+#include <linux/module.h>
 #include "bcm_kril_common.h"
 #include "bcm_kril_capi2_handler.h"
 #include "bcm_kril_cmd_handler.h"

@@ -312,7 +312,6 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 #endif
 	}
 #endif
-#endif
 
  Exit:
 	return error ? error : n;

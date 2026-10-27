@@ -13,6 +13,7 @@
 * other than the GPL, without Broadcom's express prior written consent.
 *******************************************************************************/
 
+#include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/ctype.h>

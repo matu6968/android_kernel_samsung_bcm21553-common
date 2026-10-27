@@ -12,6 +12,7 @@
 #if !defined(_CAMACQ_CORE_C_)
 #define _CAMACQ_CORE_C_
 
+#include <linux/module.h>
 #include "camacq_model.h"
 #include "camacq_core.h"
 #include "camacq_api.h"

@@ -27,6 +27,7 @@
 
 /* ---- Include Files ---------------------------------------------------- */
 
+#include <linux/module.h>
 #include "lcdc.h"
 #include <linux/broadcom/lcdc_dispimg.h>
 #include <linux/rtc.h>

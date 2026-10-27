@@ -20,6 +20,7 @@
  *
  */
 
+#include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>

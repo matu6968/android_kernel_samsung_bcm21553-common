@@ -24,8 +24,8 @@ the GPL, without Broadcom's express prior written consent.
 
 #include <sound/core.h>
 #include <sound/control.h>
-#include <sound/pcm_params.h>
 #include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <sound/rawmidi.h>
 #include <sound/initval.h>
 

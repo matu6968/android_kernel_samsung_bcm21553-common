@@ -366,5 +366,5 @@ struct bcmsdhc_host {
 
 	unsigned long private[0] ____cacheline_aligned;
 	struct regulator	*vcc;
-	struct pm_qos_request_list *sdio_driver_pm_qos_req;
+	struct pm_qos_request *sdio_driver_pm_qos_req;
 };

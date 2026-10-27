@@ -924,9 +924,9 @@ static int __devinit max8986_probe(struct i2c_client *client,
 	return 0;
 
 err_request_irq:
-	mutex_destroy(max8986->list_lock);
-	mutex_destroy(max8986->i2c_rw_lock);
-	mutex_destroy(max8986->muic_int_lock);
+	mutex_destroy(&max8986->list_lock);
+	mutex_destroy(&max8986->i2c_rw_lock);
+	mutex_destroy(&max8986->muic_int_lock);
 	max8986_info = NULL;
 	destroy_workqueue(max8986->pmu_workqueue);
 err_create_workq:
@@ -948,9 +948,9 @@ static int __devexit max8986_remove(struct i2c_client *client)
 	max8986 = i2c_get_clientdata(client);
 	free_irq(client->irq, max8986);
 	mfd_remove_devices(&client->dev);
-	mutex_destroy(max8986->list_lock);
-	mutex_destroy(max8986->i2c_rw_lock);
-	mutex_destroy(max8986->muic_int_lock);
+	mutex_destroy(&max8986->list_lock);
+	mutex_destroy(&max8986->i2c_rw_lock);
+	mutex_destroy(&max8986->muic_int_lock);
 
 	pm_power_off = NULL;
 	max8986_info = NULL;
